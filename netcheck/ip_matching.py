@@ -6,8 +6,7 @@ Purpose: Match IP addresses.
 
 """
 
-import trace_preprocessor
-import trace_output
+import posix_preprocessor
 import ipaddr
 import os.path
 
@@ -15,6 +14,7 @@ import os.path
 
 DEFAULT_IGNORE_ADDRS = [('127.0.0.1', 53)]
 
+ENABLE_TCP_DATA_MATCHING = None
 
 
 HOST_INFO = []
@@ -26,11 +26,13 @@ tcp_matches = set()
 
 
 
-def initialize_hosts(config_filename):
+def initialize_hosts(config_filename, enable_tcp_data_matching):
   """
   Loads a configuration file that specifies a test to verify and returns
   a dictionary of preprocessed traces to feed into the model.
   """
+  global ENABLE_TCP_DATA_MATCHING
+  ENABLE_TCP_DATA_MATCHING = enable_tcp_data_matching
 
   for ip, port in DEFAULT_IGNORE_ADDRS:
     IGNORE_ADDRS.add((ipaddr.IPAddress(ip), port))
@@ -39,7 +41,7 @@ def initialize_hosts(config_filename):
 
   config_file = open(config_filename, 'r')
   trace_dict = {}
-  trace_list = []
+  trace_dict_copy = {}
 
   print "-" * 80
   print "Configuration"
@@ -115,14 +117,14 @@ def initialize_hosts(config_filename):
 
       filename = os.path.join(base_dir, tokens[0])
 
-      trace = trace_preprocessor.get_trace_from_filename(filename)
-      trace = trace_preprocessor.preprocess_trace(trace, trace_id)
+      trace = posix_preprocessor.get_trace_from_filename(filename)
+      trace = posix_preprocessor.preprocess_trace(trace, trace_id)
       trace_dict[trace_id] = trace
 
-      if trace_output.ENABLE_TCP_DATA_MATCHING:
-        trace_copy = trace_preprocessor.get_trace_from_filename(filename)
-        trace_copy = trace_preprocessor.preprocess_trace(trace_copy, trace_id, False)
-        trace_list.append(trace_copy)
+      if ENABLE_TCP_DATA_MATCHING:
+        trace_copy = posix_preprocessor.get_trace_from_filename(filename)
+        trace_copy = posix_preprocessor.preprocess_trace(trace_copy, trace_id, False)
+        trace_dict_copy[trace_id] = trace_copy
 
       TRACE_INFO[trace_id] = {'name': name, 'host': host, 'file': filename}
 
@@ -176,26 +178,28 @@ def initialize_hosts(config_filename):
 
   print
 
-  if trace_output.ENABLE_TCP_DATA_MATCHING:
-    find_tcp_matches(trace_list)
+  if ENABLE_TCP_DATA_MATCHING:
+    find_tcp_matches(trace_dict_copy)
 
   config_file.close()
   return trace_dict
 
 
 
-def initialize_unit_test(trace_filename_list):
+def initialize_unit_test(trace_filename_list, enable_tcp_data_matching):
   """
   Loads a list of trace files and initializes the network configuration
   based on the assumption that all traces were collected on the same
   host and that we don't need to specify any host IPs.
   """
+  global ENABLE_TCP_DATA_MATCHING
+  ENABLE_TCP_DATA_MATCHING = enable_tcp_data_matching
 
   for ip, port in DEFAULT_IGNORE_ADDRS:
     IGNORE_ADDRS.add((ipaddr.IPAddress(ip), port))
 
   trace_dict = {}
-  trace_list = []
+  trace_dict_copy = {}
 
   print "-" * 80
   print "Configuration"
@@ -215,27 +219,27 @@ def initialize_unit_test(trace_filename_list):
     name = "trace" + trace_id
     print " trace", trace_id, "(" + filename + ")"
 
-    trace = trace_preprocessor.get_trace_from_filename(filename)
-    trace = trace_preprocessor.preprocess_trace(trace, trace_id)
+    trace = posix_preprocessor.get_trace_from_filename(filename)
+    trace = posix_preprocessor.preprocess_trace(trace, trace_id)
     trace_dict[trace_id] = trace
 
-    if trace_output.ENABLE_TCP_DATA_MATCHING:
-      trace_copy = trace_preprocessor.get_trace_from_filename(filename)
-      trace_copy = trace_preprocessor.preprocess_trace(trace_copy, trace_id, False)
-      trace_list.append(trace_copy)
+    if ENABLE_TCP_DATA_MATCHING:
+      trace_copy = posix_preprocessor.get_trace_from_filename(filename)
+      trace_copy = posix_preprocessor.preprocess_trace(trace_copy, trace_id, False)
+      trace_dict_copy[trace_id] = trace_copy
 
     TRACE_INFO[trace_id] = {'name': name, 'host': 0, 'file': filename}
 
   print
 
-  if trace_output.ENABLE_TCP_DATA_MATCHING:
-    find_tcp_matches(trace_list)
+  if ENABLE_TCP_DATA_MATCHING:
+    find_tcp_matches(trace_dict_copy)
 
   return trace_dict
   
 
 
-def find_tcp_matches(trace_list):
+def find_tcp_matches(trace_dict):
   """
   Initializes TCP matches set with (connected socket, accepting socket)
   tuples for each pair of TCP sockets that look like a connection.
@@ -244,8 +248,8 @@ def find_tcp_matches(trace_list):
   connect_sock_list = []
   accept_sock_list = []
 
-  for trace in trace_list:
-    connect_socks, accept_socks = trace_preprocessor.get_sock_data(trace)
+  for trace_id in trace_dict:
+    connect_socks, accept_socks = posix_preprocessor.get_sock_data(trace_id, trace_dict[trace_id])
     connect_sock_list.extend(connect_socks)
     accept_sock_list.extend(accept_socks)
 
@@ -278,7 +282,7 @@ def is_socket_match(connecting_sock, accepting_sock):
   Returns True if the sockets look like they might form a connection.
   """
 
-  if trace_output.ENABLE_TCP_DATA_MATCHING:
+  if ENABLE_TCP_DATA_MATCHING:
     return (connecting_sock, accepting_sock) in tcp_matches
   else:
     return True
@@ -290,7 +294,7 @@ def is_connected_socket(sock):
   Returns True if the socket is part of a connection.
   """
 
-  if trace_output.ENABLE_TCP_DATA_MATCHING:
+  if ENABLE_TCP_DATA_MATCHING:
     return sock in tcp_sockets
   else:
     return True

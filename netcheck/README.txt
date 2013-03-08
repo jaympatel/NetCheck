@@ -20,7 +20,7 @@ strace output into easily usable data structures. Can be used either to
 read the next system call from a file or to read in the entire trace.
 
 
-trace_preprocessor
+posix_preprocessor
 ------------------------------------------------------------------------
 Uses generators to wrap the output of posix_test_harness_functions. This
 means that the returned "traces" are actually reading and parsing lines
@@ -48,15 +48,7 @@ As part of this matching, it also identifies properties of possible
 connections that the user should be aware of, like traversing a NAT,
 connecting to 0.0.0.0, or connecting to an IPv6 address from an IPv4
 address. Uses ipaddr extensively for indentifying properties of IP
-addresses and uses trace_preprocessor to load preprocessed trace files.
-
-
-trace_output
-------------------------------------------------------------------------
-This is where I've been moving all the logging functionality from
-trace_ordering. It also now handles generating some statistic and
-warnings based on the exceptions raised by the model over the course of
-its execution and the final state of the model. 
+addresses and uses posix_preprocessor to load preprocessed trace files.
 
 
 model_network_syscalls
@@ -68,12 +60,30 @@ model state. Uses ip_matching to determine which socket pairs
 correspond to network connections.
 
 
-trace_ordering
+posix_ordering
 ------------------------------------------------------------------------
 Used to run configuration files. Takes the name of a configuration file
 as its only argument and feeds this name into ip_matching to initialize
 the network configuration and get back a list of traces to verify. Then
-the module starts feeding system calls from the traces into
-model_network_syscalls to try and produce an ordering of the calls.
-Uses trace_output for logging results.
+the module uses trace_ordering to perform the ordering.
+Uses posix_output for logging results.
+
+
+posix_output
+------------------------------------------------------------------------
+This is where I've been moving all the logging functionality from
+posix_ordering. It also now handles generating some statistic and
+warnings based on the exceptions raised by the model over the course of
+its execution and the final state of the model.
+
+
+trace_ordering
+------------------------------------------------------------------------
+Used to order traces. This and trace_output are the two non posix
+specific files. Uses trace_output for logging results.
+
+
+trace_output
+------------------------------------------------------------------------
+Contains a number of useful function for logging ordering results.
 

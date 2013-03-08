@@ -12,8 +12,13 @@ import socket
 
 # source: http://code.google.com/p/ipaddr-py/
 from ipaddr import IPAddress
-import trace_output
 import ip_matching
+
+from trace_ordering import SyscallException
+from trace_ordering import SyscallError
+from trace_ordering import SyscallWarning
+from trace_ordering import SyscallNotice
+from trace_ordering import SyscallDontCare
 
 ##### GLOBALS
 AF_INET = PF_INET = 2
@@ -156,26 +161,12 @@ pending_connections = dict()
 # keeps information about possible network misbehavior, if poll/select returns timeout
 poll_timeout = set([])
 
-##### Exception Classes 
 
-class SyscallException(Exception):
-   """An exception raised by the model"""
 
-class SyscallError(SyscallException):
-   """A system call had an error"""
+def socket_syscall(node_name, args, ret):
 
-class SyscallWarning(SyscallException):
-   """A system call had a warning"""
-
-class SyscallDontCare(SyscallException):
-   """We don't care about this system call"""
-
-class SyscallNotice(SyscallException):
-   """We can't do anything about it, but we should log it"""
-
-#####
-
-def socket_syscall(node_name, dom, typ, prot, sockfd):
+   dom, typ, prot = args
+   sockfd, impl_errno = ret
 
    if sockfd < 0:
       raise SyscallDontCare("socket_syscall", 'MINUS_FD', "Socket returned a negative file descriptor.")	 
@@ -224,7 +215,10 @@ def socket_syscall(node_name, dom, typ, prot, sockfd):
 
       
 
-def bind_syscall(node_name, sock, addr, port, err):
+def bind_syscall(node_name, args, ret):
+
+   sock, addr, port = args
+   impl_ret, err = ret
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare("bind_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
@@ -301,7 +295,10 @@ def bind_syscall(node_name, sock, addr, port, err):
    return (0, None)
 
 
-def listen_syscall(node_name, sock, log, err):
+def listen_syscall(node_name, args, ret):
+
+   sock, log = args
+   impl_ret, err = ret
 
    if (node_name, sock) not in active_sockets:
       #return (-1, 'EBADF')
@@ -324,7 +321,10 @@ def listen_syscall(node_name, sock, log, err):
 
 
 
-def accept_syscall(node_name, sock, peer_addr, peer_port, connected_socket, err):
+def accept_syscall(node_name, args, ret):
+
+   sock, peer_addr, peer_port = args
+   connected_socket, err = ret
 
    if not isinstance(connected_socket, int):
       raise SyscallDontCare("accept_syscall", 'DONT_CARE', "The connected socket is not an integer..")
@@ -356,7 +356,7 @@ def accept_syscall(node_name, sock, peer_addr, peer_port, connected_socket, err)
 
    for require_data_matches in [True, False]:
       for require_established in [True, False]:
-         if (require_data_matches or require_established) and not trace_output.ENABLE_TCP_DATA_MATCHING:
+         if (require_data_matches or require_established) and not ip_matching.ENABLE_TCP_DATA_MATCHING:
             continue
 
          # Search through the available connections until we find one that matches the one we want to accept
@@ -388,7 +388,7 @@ def accept_syscall(node_name, sock, peer_addr, peer_port, connected_socket, err)
                for warning in warnings:
                   print " * [Warning]", warning
 
-               if not require_data_matches and trace_output.ENABLE_TCP_DATA_MATCHING:
+               if not require_data_matches and ip_matching.ENABLE_TCP_DATA_MATCHING:
                   print " * [Warning] The data sent/received by this pair of sockets doesn't match"
 
                pending_connections[(node_name, sock)].pop(index)
@@ -422,7 +422,10 @@ def accept_syscall(node_name, sock, peer_addr, peer_port, connected_socket, err)
 
 
 # TODO: handle getsockopt(49, SOL_SOCKET, SO_ERROR, [111], [4]) = 0            
-def connect_syscall(node_name, sock, addr, port, err):
+def connect_syscall(node_name, args, ret):
+
+   sock, addr, port = args
+   impl_ret, err = ret
 
    if (node_name, sock) not in active_sockets:
       #return (-1, 'EBADF')
@@ -485,9 +488,9 @@ def connect_syscall(node_name, sock, addr, port, err):
 
             sockets[(node_name, sock)]['state'] = 'PENDING'
             # This allows us to consider the socket if we are matching up data send/received.
-            if trace_output.ENABLE_TCP_DATA_MATCHING and ip_matching.is_connected_socket((node_name, sock)):
+            if ip_matching.ENABLE_TCP_DATA_MATCHING and ip_matching.is_connected_socket((node_name, sock)):
                try:
-                  connect_syscall(node_name, sock, addr, port, None)
+                  connect_syscall(node_name, args, (0, None))
                   sockets[(node_name, sock)]['state'] = 'PENDING/CONNECTED'
                except SyscallException:
                   pass
@@ -579,20 +582,23 @@ def connect_syscall(node_name, sock, addr, port, err):
 # and writev_syscall
 # may be used only when the socket is in a connected state
 # it should only be used for IPPROTO_TCP protocol
-def send_syscall(node_name, sock, msg, flags, msg_len, err):
+def send_syscall(node_name, args, ret):
+
+   sock, msg, flags = args
+   msg_len, err = ret
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare ("send_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
 
    if sockets[(node_name, sock)]['protocol'] != IPPROTO_TCP:
-      return sendto_syscall(node_name, sock, msg, msg_len, flags, '', 0, err)
+      return sendto_syscall(node_name, (sock, msg, flags, '', 0), ret)
 
    if 'PENDING' in sockets[(node_name, sock)]['state']:
       if err == 'EAGAIN' or err == 'EWOULDBLOCK':
          raise SyscallNotice("recv_syscall", 'EAGAIN/EWOULDBLOCK', "No data was sent.")
       # Node didn't actually call connect again to see that the nonblocking connect succeeded
-      connect_syscall(node_name, sock, sockets[(node_name, sock)]['peer_ip'],
-                       sockets[(node_name, sock)]['peer_port'], err)
+      connect_syscall(node_name, (sock, sockets[(node_name, sock)]['peer_ip'],
+                       sockets[(node_name, sock)]['peer_port']), ret)
 
    if sockets[(node_name, sock)]['state'] != 'CONNECTED':
       raise SyscallWarning("send_syscall", 'ENOTCONN', "[Application Error] The descriptor is not connected.")
@@ -685,14 +691,17 @@ def send_syscall(node_name, sock, msg, flags, msg_len, err):
 
 
 # same: sendmsg_syscall with msg_len = len(msg)
-def sendto_syscall(node_name, sock, msg, msg_len, flags, dest_addr, dest_port, err):
+def sendto_syscall(node_name, args, ret):
+
+   sock, msg, flags, dest_addr, dest_port = args
+   msg_len, err = ret
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare ("sendto_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
 
    # if IP addr/port is not defined, use send instead
    if sockets[(node_name, sock)]['protocol'] == IPPROTO_TCP:
-      send_syscall(node_name, sock, msg, flags, msg_len, err)
+      send_syscall(node_name, (sock, msg, flags), ret)
       if dest_addr:
          raise SyscallWarning("sendto_syscall", "EISCONN", "[Application Error] The connection-mode socket was connected already but a recipient was specified.")
       return (msg_len, None)
@@ -811,9 +820,39 @@ def sendto_syscall(node_name, sock, msg, msg_len, flags, dest_addr, dest_port, e
    return (msg_len, None)
 
 
+
+def sendmsg_syscall(node_name, args, ret):
+
+   sock, msg, dest_addr, dest_port, flags = args
+   sendto_args = sock, msg, flags, dest_addr, dest_port
+
+   return sendto_syscall(node_name, sendto_args, ret)
+
+
+
+def write_syscall(node_name, args, ret):
+
+   sock, msg = args
+   send_args = sock, msg, 0
+
+   return send_syscall(node_name, send_args, ret)
+
+
+
+def writev_syscall(node_name, args, ret):
+
+   sock, msg, count = args
+   send_args = sock, msg, 0
+
+   return send_syscall(node_name, send_args, ret)
+
+
+
 # Implementation is not full.. I only model this for apache..
 # I assume that it sends data to TCP sockets only. Otherwise I throw an error.
-def sendfile_syscall(node_name, sock, in_sock, offset, count, length, err):
+def sendfile_syscall(node_name, args, ret):
+
+   sock, in_sock, offset, count = args
 
    # in_sock should be a file descriptor opened for reading and out_sock should be a descriptor opened for writing.
    # So, we only care about the out_sock that will be the fd that sends the data to the peer
@@ -824,24 +863,29 @@ def sendfile_syscall(node_name, sock, in_sock, offset, count, length, err):
    if sockets[(node_name, sock)]['protocol'] != IPPROTO_TCP:
       raise SyscallWarning("sendfile_syscall", 'NOT_IMPLEMENTED', "I assume that it sends data to TCP sockets only.")
 
-   return send_syscall(node_name, sock, '', 0, length, err)
+   send_args = sock, '', 0
+
+   return send_syscall(node_name, send_args, ret)
 
 
 
-def recv_syscall(node_name, sock, buf_len, flags, msg, msg_len, err):
+def recv_syscall(node_name, args, ret):
    
+   sock, msg, buf_len, flags = args
+   msg_len, err = ret
+
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare("recv_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
 
    if sockets[(node_name, sock)]['protocol'] != IPPROTO_TCP:
-      return recvfrom_syscall(node_name, sock, buf_len, flags, '', 0, msg, msg_len, err)
+      return recvfrom_syscall(node_name, (sock, msg, buf_len, flags, '', 0), ret)
 
    if 'PENDING' in sockets[(node_name, sock)]['state']:
       if err == 'EAGAIN' or err == 'EWOULDBLOCK':
          raise SyscallNotice("recv_syscall", 'EAGAIN/EWOULDBLOCK', "No data was received.")
       # Node didn't actually call connect again to see that the nonblocking connect succeeded
-      connect_syscall(node_name, sock, sockets[(node_name, sock)]['peer_ip'],
-                       sockets[(node_name, sock)]['peer_port'], err)
+      connect_syscall(node_name, (sock, sockets[(node_name, sock)]['peer_ip'],
+                       sockets[(node_name, sock)]['peer_port']), ret)
 
    if sockets[(node_name, sock)]['state'] != 'CONNECTED':
       raise SyscallWarning("recv_syscall", 'ENOTCONN', "[Application Error] A receive is attempted on a connection-mode socket that is not connected.")
@@ -940,7 +984,10 @@ def recv_syscall(node_name, sock, buf_len, flags, msg, msg_len, err):
 
 # TODO: handle flags
 # same for read with flags = 0
-def recvfrom_syscall(node_name, sock, buf_len, flags, rem_ip, rem_port, msg, msg_len, err):
+def recvfrom_syscall(node_name, args, ret):
+
+   sock, msg, buf_len, flags, rem_ip, rem_port = args
+   msg_len, err = ret
 
    multiaddr = ''
 
@@ -949,7 +996,7 @@ def recvfrom_syscall(node_name, sock, buf_len, flags, rem_ip, rem_port, msg, msg
 
    # if IP addr/port is not defined, use recv instead
    if sockets[(node_name, sock)]['protocol'] == IPPROTO_TCP:
-      return recv_syscall(node_name, sock, buf_len, flags, msg, msg_len, err)
+      return recv_syscall(node_name, (sock, msg, buf_len, flags), ret)
 
    # when it comes to multicasting, keep only the ip addr of the group forgetting the initial remote addr
    if 'multicast' in sockets[(node_name, sock)]:
@@ -1220,9 +1267,31 @@ def recvfrom_syscall(node_name, sock, buf_len, flags, rem_ip, rem_port, msg, msg
       # the model does not have to handle blocking operations.. (right?)
       
       raise SyscallError("recvfrom_syscall", 'MSGNOTSENT', "The message has not been sent yet.")
- 
-       
-def close_syscall(node_name, sock, err):
+
+
+
+def recvmsg_syscall(node_name, args, ret):
+
+   sock, msg, buf_len, rem_ip, rem_port, flags = args
+   recvfrom_args = sock, msg, buf_len, flags, rem_ip, rem_port
+
+   return recvfrom_syscall(node_name, recvfrom_args, ret)
+
+
+
+def read_syscall(node_name, args, ret):
+
+   sock, msg, buf_len = args
+   recv_args = sock, msg, buf_len, 0
+
+   return recv_syscall(node_name, recv_args, ret)
+
+
+
+def close_syscall(node_name, args, ret):
+
+   sock, = args
+   impl_ret, err = ret
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare("close_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
@@ -1283,7 +1352,10 @@ def close_syscall(node_name, sock, err):
    return (0, None)
 
 
-def shutdown_syscall(node_name, sock, how):
+def shutdown_syscall(node_name, args, ret):
+
+   sock, how = args
+   impl_ret, err = ret
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare("shutdown_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
@@ -1315,7 +1387,10 @@ def shutdown_syscall(node_name, sock, how):
 
 
 
-def setsockopt_syscall(node_name, sock, level, optname, optval):
+def setsockopt_syscall(node_name, args, ret):
+
+   sock, level, optname, optval = args
+   impl_ret, err = ret
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare ("setsockopt_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
@@ -1426,7 +1501,10 @@ def setsockopt_syscall(node_name, sock, level, optname, optval):
       raise SyscallNotice("setsockopt_syscall", 'UNKNOWN_LEVEL', "We don't handle this level.")
 
 
-def getsockopt_syscall(node_name, sock, level, optname):
+def getsockopt_syscall(node_name, args, ret):
+
+   sock, level, optname = args
+   impl_ret, err = ret
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare ("getsockopt_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
@@ -1508,7 +1586,11 @@ def getsockopt_syscall(node_name, sock, level, optname):
 
 
 
-def getpeername_syscall(node_name, sock, peer_addr, peer_port):
+def getpeername_syscall(node_name, args, ret):
+   
+   sock, = args
+   impl_ret, err = ret
+   peer_addr, peer_port = impl_ret
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare ("getpeername_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
@@ -1520,7 +1602,11 @@ def getpeername_syscall(node_name, sock, peer_addr, peer_port):
 
 
 
-def getsockname_syscall(node_name, sock, addr, port):
+def getsockname_syscall(node_name, args, ret):
+   
+   sock, = args
+   impl_ret, err = ret
+   addr, port = impl_ret
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare ("getsockname_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
@@ -1544,11 +1630,10 @@ def getsockname_syscall(node_name, sock, addr, port):
 
 
 # I'll work only on the operation that affect our model
-def fcntl_syscall(ret, *args):
+def fcntl_syscall(node_name, args, ret):
 
-   node_name = args[0]
-   sock = args[1]
-   cmd = args[2]
+   sock = args[0]
+   cmd = args[1]
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare ("fcntl_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
@@ -1557,7 +1642,7 @@ def fcntl_syscall(ret, *args):
    # I'm not sure we need to handle F_DUPFD_CLOEXEC
 
    if cmd == F_SETFL:
-      arg = args[3]
+      arg = args[2]
 
       if arg & O_NONBLOCK != 0:
          sockets[(node_name, sock)]['nonblock'] = (1, 1)
@@ -1571,7 +1656,9 @@ def fcntl_syscall(ret, *args):
 
 
    
-def ioctl_syscall(node_name, sock, command, value):
+def ioctl_syscall(node_name, args, ret):
+
+   sock, command, value = args
 
    if (node_name, sock) not in active_sockets:
       raise SyscallDontCare ("ioctl_syscall", 'DONT_CARE', "The socket argument is not a valid file descriptor.")
@@ -1593,7 +1680,10 @@ def ioctl_syscall(node_name, sock, command, value):
 
 # TODO: how I should handle writefds and should I take into consideration the timeout value??	 
 
-def select_syscall(node_name, readfds, writefds, errorfds, timeout, ret1, ret2):
+def select_syscall(node_name, args, ret):
+   
+   readfds, writefds, errorfds, timeout = args
+   ret1, ret2 = ret
 
    if ret1 == -1:
       raise SyscallDontCare ("select_syscall", 'DONT_CARE', "System call failed for some reason.")
@@ -1681,8 +1771,11 @@ def select_syscall(node_name, readfds, writefds, errorfds, timeout, ret1, ret2):
    return (ret1, ret2)
 
 
-#def poll_syscall(node_name, fds, events, timeout, sock, event):
-def poll_syscall(node_name, pollin, pollout, pollerr, timeout, ret1, ret2):
+
+def poll_syscall(node_name, args, ret):
+
+   pollin, pollout, pollerr, timeout = args
+   ret1, ret2 = ret
 
    if ret1 == -1:
       raise SyscallDontCare ("poll_syscall", 'DONT_CARE', "System call failed for some reason.")
@@ -1782,4 +1875,36 @@ def care_about_fd_list(node_name, fd_list):
             return True
 
    return False
+
+
+
+##### System call mappings #####
+
+SYSCALL_DICT = {
+   'accept_syscall' :      accept_syscall,
+   'bind_syscall' :        bind_syscall,
+   'close_syscall' :       close_syscall,
+   'connect_syscall' :     connect_syscall,
+   'fcntl_syscall' :       fcntl_syscall,
+   'getpeername_syscall' : getpeername_syscall,
+   'getsockname_syscall' : getsockname_syscall,
+   'getsockopt_syscall' :  getsockopt_syscall,
+   'ioctl_syscall' :       ioctl_syscall,
+   'listen_syscall' :      listen_syscall,
+   'poll_syscall' :        poll_syscall,
+   'read_syscall' :        read_syscall,
+   'recv_syscall' :        recv_syscall,
+   'recvfrom_syscall':     recvfrom_syscall,
+   'recvmsg_syscall' :     recvmsg_syscall,
+   'select_syscall' :      select_syscall,
+   'send_syscall' :        send_syscall,
+   'sendfile_syscall' :    sendfile_syscall,
+   'sendmsg_syscall' :     sendmsg_syscall,
+   'sendto_syscall' :      sendto_syscall,
+   'setsockopt_syscall' :  setsockopt_syscall,
+   'shutdown_syscall' :    shutdown_syscall,
+   'socket_syscall' :      socket_syscall,
+   'write_syscall' :       write_syscall,
+   'writev_syscall' :      writev_syscall,
+}
 

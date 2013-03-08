@@ -71,12 +71,12 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
   """
   A generator that iterates through trace and rewrites the calls so
   file descriptors are replaced with ID numbers with a one-to-one
-  correspondence to sockets we might care about and the pids are replaced
-  with the given trace ID. Clone, dup, and fcntl calls that duplicate
-  file descriptors are handled by the preprocessor and not passed on in
-  the generated trace. Only the close call that closes the last open
-  reference to a socket is yielded. Any calls not relating to sockets
-  we might care about are also stripped from the trace.
+  correspondence to sockets we might care about and the pids are removed
+  Clone, dup, and fcntl calls that duplicate file descriptors are handled
+  by the preprocessor and not passed on in the generated trace. Only the
+  close call that closes the last open reference to a socket is yielded.
+  Any calls not relating to sockets we might care about are also stripped
+  from the trace.
   """
 
   sock_counter = 0
@@ -92,13 +92,13 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
   for name, args, ret in trace:
     real_pid = args[0]
     pid = pid_map.get(real_pid, real_pid)
-    args = (trace_id,) + args[1:]
+    args = args[1:]
 
     # TODO: in cases where we create a file descriptor that we think is
     # already open, we should flag this somehow
 
     if name == 'socket_syscall':
-      if args[1] != PF_INET and args[1] != PF_INET6:
+      if args[0] != PF_INET and args[0] != PF_INET6:
         continue
       if ret[0] == -1:
         continue
@@ -108,12 +108,12 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
       fd_map[(pid, ret[0])] = sock
       ret = (sock, None)
 
-      if args[2] == SOCK_STREAM and (args[3] == IPPROTO_TCP or args[3] == 0):
+      if args[1] == SOCK_STREAM and (args[2] == IPPROTO_TCP or args[2] == 0):
         tcp_socks.add(sock)
 
     elif name == 'clone_syscall':
       if ret[0] != -1:
-        if args[1] & CLONE_FILES != 0:
+        if args[0] & CLONE_FILES != 0:
           pid_map[ret[0]] = pid
         else:
           for fd in fd_map.copy():
@@ -122,7 +122,7 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
       continue
 
     elif name == 'select_syscall':
-      _, readfds, writefds, errorfds, timeout = args
+      readfds, writefds, errorfds, timeout = args
 
       new_readfds = []
       for fd in readfds:
@@ -142,7 +142,7 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
       if not new_readfds and not new_writefds and not new_errorfds:
         continue
 
-      args = trace_id, new_readfds, new_writefds, new_errorfds, timeout
+      args = new_readfds, new_writefds, new_errorfds, timeout
 
       if not isinstance(ret[0], int):
         r_in, r_out = ret
@@ -163,7 +163,7 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
         ret = new_r_in, new_r_out
 
     elif name == 'poll_syscall':
-      _, pollin, pollout, pollerr, timeout = args
+      pollin, pollout, pollerr, timeout = args
 
       new_pollin = []
       for fd in pollin:
@@ -183,7 +183,7 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
       if not new_pollin and not new_pollout and not new_pollerr:
         continue
 
-      args = trace_id, new_pollin, new_pollout, new_pollerr, timeout
+      args = new_pollin, new_pollout, new_pollerr, timeout
 
       if not isinstance(ret[0], int):
 
@@ -210,17 +210,17 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
         ret = ((new_r_in, new_r_out, new_r_err), None)
 
     else:
-      fd = (pid, args[1])
+      fd = (pid, args[0])
 
       if name == 'dup_syscall' or name == 'dup2_syscall' or \
-          (name == 'fcntl_syscall' and args[2] == F_DUPFD):
-        if ret[0] != -1 and ret[0] != args[1]:
+          (name == 'fcntl_syscall' and args[1] == F_DUPFD):
+        if ret[0] != -1 and ret[0] != args[0]:
           new_fd = (pid, ret[0])
           if new_fd in fd_map:
             old_sock = fd_map[new_fd]
             del fd_map[new_fd]
             if old_sock not in fd_map.values():
-              yield ('implicit_close', (trace_id, old_sock), (0, None))
+              yield ('close_syscall', (old_sock,), (0, None))
           if fd in fd_map:
             fd_map[new_fd] = fd_map[fd]
         continue
@@ -229,7 +229,7 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
         continue
 
       sock = fd_map[fd]
-      args = (trace_id, sock) + args[2:]
+      args = (sock,) + args[1:]
 
       if name in SEND_SYSCALLS or name in RECV_SYSCALLS or name == 'shutdown_syscall':
         if sock in sock_pid and sock_pid[sock] != real_pid:
@@ -267,11 +267,11 @@ def preprocess_trace(trace, trace_id, print_warnings=True):
 
   # Do implicit closes for all currently open sockets.
   for sock in set(fd_map.values()):
-    yield ('implicit_close', (trace_id, sock), (0, None))
+    yield ('close_syscall', (sock,), (0, None))
 
 
 
-def get_sock_data(trace):
+def get_sock_data(trace_id, trace):
   """
   Takes a trace and returns (connect_sock_list, accept_sock_list), where
   both lists contain dictionaries containing sent and received data for
@@ -291,14 +291,14 @@ def get_sock_data(trace):
       continue
 
     elif name == 'socket_syscall':
-      trace_id, dom, typ, prot = args
+      dom, typ, prot = args
       if typ == SOCK_STREAM and (prot == IPPROTO_TCP or prot == 0):
         tcp_sockets[impl_ret] = {'name': (trace_id, impl_ret),
                                  'sndbuf': '', 'rcvbuf': '',
                                  'sndlen': 0, 'rcvlen':0}
 
     elif name == 'accept_syscall':
-      trace_id, sock, ip, port = args
+      sock, ip, port = args
       if sock not in tcp_sockets:
         continue
       sock_state = {'name': (trace_id, impl_ret),
@@ -309,7 +309,7 @@ def get_sock_data(trace):
       accept_sock_list.append(sock_state)
 
     elif name == 'connect_syscall':
-      trace_id, sock, ip, port = args
+      sock, ip, port = args
       if sock not in tcp_sockets:
         continue
       if sock not in connected_set:
@@ -323,16 +323,16 @@ def get_sock_data(trace):
       flags = 0
 
       if name == 'recvfrom_syscall':
-        node_id, sock, msg, buf_len, flags, ip, port = args
+        sock, msg, buf_len, flags, ip, port = args
 
       elif name == "recvmsg_syscall":
-        node_id, sock, msg, buf_len, ip, port, flags = args
+        sock, msg, buf_len, ip, port, flags = args
 
       elif name == 'recv_syscall':
-        node_id, sock, msg, buf_len, flags = args
+        sock, msg, buf_len, flags = args
 
       elif name == 'read_syscall':
-        node_id, sock, msg, buf_len = args
+        sock, msg, buf_len = args
 
       if impl_ret < 0 or flags == MSG_PEEK:
         continue
@@ -348,29 +348,29 @@ def get_sock_data(trace):
       tcp_sockets[sock]['rcvlen'] += impl_ret
 
     elif name in SEND_SYSCALLS:
-      if args[1] not in tcp_sockets:
+      if args[0] not in tcp_sockets:
         continue
 
       flags = 0
       msg = ''
 
       if name == 'send_syscall':
-        node_id, sock, msg, flags = args
+        sock, msg, flags = args
 
       elif name == 'write_syscall':
-        node_id, sock, msg = args
+        sock, msg = args
 
       elif name == 'writev_syscall':
-        node_id, sock, msg, count = args
+        sock, msg, count = args
 
       elif name == 'sendto_syscall':
-        node_id, sock, msg, flags, ip, port = args
+        sock, msg, flags, ip, port = args
 
       elif name == "sendmsg_syscall":
-        node_id, sock, msg, ip, port, flags = args
+        sock, msg, ip, port, flags = args
 
       elif name == "sendfile_syscall":
-        node_id, sock, in_sock, offset, count = args
+        sock, in_sock, offset, count = args
 
       if impl_ret < 0:
         continue
