@@ -8,6 +8,7 @@ and not duplicated.
 """
 
 import posix_test_harness_functions as parser
+import os
 
 PF_INET = 2
 PF_INET6 = 30
@@ -58,7 +59,15 @@ def get_trace_from_filename(filename):
   referenced by the given file name.
   """
 
-  file_obj = open(filename, 'r')
+  #file_obj = open(filename, 'r')
+  try:
+    fd = os.open(filename, os.O_RDONLY)
+  except:
+    raise Exception("'" + filename + "' is not at the correct location.\n\n\
+      'python posix_ordering.py CONFIG_FILE': trace file(s) should be at the same dir as CONFIG_FILE.\n\n\
+      'python posix_ordering.py -u trace_file1 trace_file2 etc': trace file(s) should be at the same dir as posix_ordering.py.\n")
+    
+  file_obj = os.fdopen(fd)
 
   for syscall in get_trace_from_file(file_obj):
     yield syscall
