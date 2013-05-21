@@ -8,7 +8,7 @@ and not duplicated.
 """
 
 import posix_test_harness_functions as parser
-import os
+import sys
 
 PF_INET = 2
 PF_INET6 = 30
@@ -59,15 +59,19 @@ def get_trace_from_filename(filename):
   referenced by the given file name.
   """
 
-  #file_obj = open(filename, 'r')
   try:
-    fd = os.open(filename, os.O_RDONLY)
-  except:
-    raise Exception("'" + filename + "' is not at the correct location.\n\n\
+    file_obj = open(filename, 'r')    
+  except IOError, e:
+    if e[0] == 2:  # error code 2: file does not exist
+      print "'" + filename + "' is not at the correct location...exiting\n\n\
       'python posix_ordering.py CONFIG_FILE': trace file(s) should be at the same dir as CONFIG_FILE.\n\n\
-      'python posix_ordering.py -u trace_file1 trace_file2 etc': trace file(s) should be at the same dir as posix_ordering.py.\n")
-    
-  file_obj = os.fdopen(fd)
+      'python posix_ordering.py -u trace_file1 trace_file2 etc': trace file(s) should be at the same dir as posix_ordering.py.\n"
+      sys.exit(0)      
+    elif e[0] == 21:  # error code 21: it is a directory rather than a file
+      print "'" + filename + "' is a directory...exiting\n"  
+      sys.exit(0)
+    else:  # for all other cases of IOError's, simply raise them
+      raise        
 
   for syscall in get_trace_from_file(file_obj):
     yield syscall
