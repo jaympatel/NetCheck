@@ -13,7 +13,7 @@ from ip_matching import is_addr_match
 
 
 
-###### Output Level Configuration #####
+###### Output Level Configuration ######
 
 # Print system calls that raise warnings even if SHOW_SYSCALLS  is False
 SHOW_WARNINGS = True
