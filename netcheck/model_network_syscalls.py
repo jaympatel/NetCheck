@@ -1342,9 +1342,9 @@ def recvfrom_syscall(node_name, args, ret):
                   print "(public address " + ip_matching.format_addr(rem_ip, rem_port) + ")",
                print
 
-               for warning in local_warnings + remote_warnings:
-                  print " * [Warning]", warning
-
+               for warn in local_warnings + remote_warnings:
+                  print " * [Warning]", warn
+                 
                if warning:
                   raise warning
 
@@ -1396,8 +1396,8 @@ def recvfrom_syscall(node_name, args, ret):
                   print "(public address " + ip_matching.format_addr(rem_ip, rem_port) + ")",
                print
 
-               for warning in local_warnings + remote_warnings:
-                  print " * [Warning]", warning
+               for warn in local_warnings + remote_warnings:
+                  print " * [Warning]", warn
 
                if warning:
                   raise warning
