@@ -1,0 +1,155 @@
+\section{\blurname Design}
+
+\begin{comment}
+\subsection{Ubiquitous Sensing}
+
+{\bf Motivation. }Smart devices today provide users with pervasive
+connectivity. 
+An understanding of smartphones would give great insights into problems 
+across disciplines.   For example, urban scientists can investigate real-time 
+traffic patterns~\cite{zhuang2011time}, 
+public safety agencies can benefit from low-cost, low-latency emergency 
+message dissemination~\cite{zhuang2010probabilistic}, and broadcasting audio /
+video 
+clips of life-threatening hazard~\cite{zhuang2012uplink} in disaster response.
+Additionally, sensor data has significant value in many other domains: 
+it enables mobile application performance monitoring
+\cite{ravindranathappinsight}, 
+increases cost-effectiveness of network deployment for telecom and mobile
+service providers \cite{Sieb05}, enhances location and social awareness within
+applications from a social science standpoint \cite{hsu2007mining}, and enables
+remote health monitoring and remote diagnosis for health professionals and
+doctors \cite{infections, health}, etc.  
+Due to the lack of a unified instrument that supports these  
+applications, researchers and scientists cannot fully explore such potential 
+that could tremendously improve the quality of people's life.  
+The \sensorname project~\cite{seattle-sensor-project, sensor} will leverage
+\sysname to allow uniform sensor data access 
+between different research groups across
+domains.
+
+{\bf Overview of the Solution.}
+\sensorname will allow a researcher who wants to
+build a sensing application the ability to write the majority of their
+application in \sensorname, yet be able to execute it across Android, iOS, 
+Maemo, and other mobile operating systems.  
+% 
+Better yet, gaining end user adoption does not need
+to be done on a per-project basis.   The Seattle Sensors project
+builds a common framework~\cite{rafetseder2013sensorium} that allows researchers
+to share their sensor data 
+across diverse projects.   This will allow a single action by a user to 
+responsibly share their sensor data with a broad array of
+social, economic, computer, and urban scientists. 
+
+{\bf Related Work. }
+Research projects such as 
+PhoneLab~\cite{phonelab} and Mobile Territorial Lab (MTL)~\cite{mtl} are just 
+starting to deploy similar services on mobile platforms to collect 
+sensor-related data from end users. However, they only 
+provide partial solutions and lack a viable plan for broad external use --- 
+the user
+base of these platforms are only limited to committed users. Their deployment
+model is
+rather constrained as researchers %are limited to a few target apps, and they 
+cannot participate proactively and deploy services tailored to different needs
+for
+their research and development. As a result, the capacity for researchers to 
+leverage each others' deployment is lacking. 
+
+{\bf What \sensorname Provides.}
+The \sensorname instrument provides a simplified and standard interface to
+access 
+sensors on end user's smartphones that allow it.
+The sandbox interacts with the physical sensors on the device through a 
+common, simplified API, which provides access to sensors
+in the same way on different devices (an XML-style interface).
+Even though data types may be different depending on the physical sensors,
+the researcher may get the data in a uniform manner.   For example,
+on an Android phone in a campus area, this library may automatically
+supplement GPS data with WiFi signal and location information~\cite{open3g,
+rafetseder2013sensorium}
+to provide more accurate information.   However, on a iPhone in a metropolitan
+area, 4G and WiFi triangulation may prove more accurate.   Libraries can
+automatically
+improve, refine, and equivocate contextual sensor data from diverse devices.  
+As a result
+a researcher can write their sensing code once, and get highly accurate 
+data across a diverse set of platforms.
+
+{\bf What Participants Build.}  
+A researcher's program can simply import the libraries for 
+reading sensor data and trivially access it.   Since the client
+software and sensor libraries make the data uniform, the exact same
+program will work on Android, iPhone, iPad, Nokia, Win 8,
+and other supported devices.  
+A researcher can also trivially exfiltrate sensor data back
+to a server of their choice (such as those provided by CUSP~\cite{cusp})  
+using our XMLRPC libraries.   This is handy
+for archival or IRB-approved data sharing.
+By pooling sensors across a wide array of end users who opt-in (as being
+developed by the Seattle Sensors project),
+a researcher can deploy a
+sensing application across thousands of smartphones around the world
+in minutes.
+\end{comment}
+
+\subsection{\blurname Overview} 
+
+\subsubsection{Overview of the Solution}
+
+Today's smartphone OSes typically expose resources in a global way. 
+For example, apps in Android~\cite{android-os} use 
+install-time manifests to request access to resources; once granted,  
+the installed app has permanent access to the requested resources.  
+Such permissions are often much more than necessary. Several related work has 
+been proposed to refine or reduce permissions on mobile
+platforms~\cite{hornyack2011these, zhou2011taming, conti2011crepe,
+pearce2012addroid} via modifying the device platform. BlurSense allows untrusted
+parties to add privacy filters from user space.  Multiple security vendors can
+efficiently and effectively collaborate to strengthen user privacy.
+
+Different from the existing privacy controls, \blurname provides a generic
+privacy protection framework called BlurSense via a richer set of control of
+privacy by third parties. Users not only gain full transparency of what
+information is captured on their devices, but also have full control over how
+much information they would share with the rest of the world --- a secure
+personal data ecosystem. After installing BlurSense, a user can install software
+from a third party (like a security vendor) that performs custom sensor
+filtering actions in response to application requests. For example, an
+application could be prevented from using motion sensors when in the background,
+or precise GPS data could be abstracted to a neighborhood or zipcode. BlurSense
+provides effective controls for smartphones, much like Flash and JavaScript
+filtering tools protect laptops and desktops (e.g., NoScript~\cite{noscript},
+AdBlock~\cite{adblock}, FlashBlock~\cite{Flashblock}). 
+
+
+\subsubsection{What \blurname Provides}
+
+Seattle provides a sensor interposition mechanism and a sandboxing mechanism
+that make it easy to implement privacy filters. A user can let a third party
+have access to their sensor data from within a security and performance isolated
+container~\cite{Cappos_CCS_10}.   By leveraging this security, the user provides
+minimal trust in the third party, but allows them an easy way to code their
+filters.   This functionality also automatically handles multiple privacy
+filters from different parties through the sandbox policy composition
+functionality~\cite{Cappos_CCS_10}.
+
+% {\bf What Participants Build.} 
+Participants will build a mechanism to trap the requests from generic
+applications and pass them into BlurSense (a proof-of-concept for 
+Android has already been built). 
+Participants will build and manage an ``App Store'' for BlurSense to allow 
+users to locate privacy filters they wish to apply.   These may range from 
+sharing sensor data with researchers by reducing
+the precision of sensor values, salting and hashing sensor values for 
+anonymizing collected data, or completely denying access to individual 
+(or all) sensors. For a particular sensor, a filter might perform an action such
+as blurring the resolution of photos and video taken by the camera, 
+removing access point information from WiFi scans, or
+omitting the motion sensor data completely.   Security and privacy groups can
+easily build and disseminate their own privacy filters they recommend to users
+by adding them to BlurSense app store. Therefore, \blurname is able to handle 
+the three categories of threats in Section~\ref{sec-threat}. 
+
+\subsection{Design Framework}

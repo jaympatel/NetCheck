@@ -1,0 +1,124 @@
+\section{Introduction}
+Smartphones and tablets are becoming the dominant way that people interact with
+the physical world.  This trend is showing no sign of stopping.  Smartphones
+overtook PC sales in 2011, and even tablets will outsell desktop PCs by
+2013~\cite{phonesales}. As of October 2012, there were more than one billion
+smartphones in use~\cite{smartphones-use}. By the end of 2013, the number of
+mobile devices (like smartphones and tablets) is projected to surpass the number
+of people on the planet~\cite{cisco-data}. Due to such ubiquity across
+demographic and geographic spectrum, utilizing smartphones would substantially
+benefit science and humanity.
+
+\begin{comment}
+First, smart devices produce immensely valuable data for researchers across
+a wide variety of disciplines. As an interface between our everyday life and the
+physical world, these devices present valuable data for 
+critical scientific and social pursuits.
+If properly harnessed, the embedded cellular, GPS, WiFi, Bluetooth, camera
+sensors, etc.,
+can objectively record information gathered from a user's
+perspective for the benefit of all. For example, it is possible for researchers
+to 
+understand carrier and device performance 
+differences~\cite{huang2010anatomizing}, increase wireless network performance
+leveraging
+user mobility~\cite{ravindranath2011improving}, improve navigation and
+personalized 
+trip management~\cite{thiagarajan2011accurate} and detect earthquakes and 
+tsunamis accurately~\cite{faulkner2011next}. Estimation of traffic in an 
+area can help transportation scientists refine usage models for environmental
+impacts~\cite{lena2002elemental}. 
+Health sciences, sociology, or any domain concerned with the movement of people
+and the associated impact could be explored~\cite{goldman2009participatory}. 
+But until now, there was no unified way to harvest these opportunities. 
+
+Second, the computational power of modern smartphones is substantial.   
+These devices provide significant
+capacity and computing power at network edge --- 
+a fact that has largely missed, except by criminals~\cite{botnet}.
+Although other services like cloud computing provide substantial computing 
+power, the location
+of cloud infrastructure is less than ideal for many users because
+of the latency when accessing many cloud datacenters.  Dedicated cloud 
+infrastructure
+also has limited host and network heterogeneity, limited scalability, and 
+lack a deployment path to end-user systems. From the success of CDNs,
+the trend has been toward pushing small datacenters close to end
+users~\cite{edge-cloud}.
+Smartphones, laptops, and tablets are already on the same network as
+the user and thus minimize latency.
+If researchers could use these devices to measure networks 
+and serve content, this would provide deep insight into parts of the Internet 
+that are currently invisible~\cite{bauermeasuring}. Therefore, harnessing the
+power of smartphones 
+provides unique opportunities for improving the quality of life
+and enhancing the operation of modern society.
+
+We propose to develop \sysname that will unleash the potential of
+tablets and smartphones. 
+Drawing on our experience (and user base) from our
+Seattle platform, \sysname will control access to computational sandboxes
+that runs unintrusively in the background of the tablets and smartphones of
+users around the world.   
+Any researcher can quickly and use the \sysname to easily access 
+resources across a huge and diverse set of smartphones and tablets.   
+(In fact thousands of researchers are already using our current 
+testbed~\cite{SeattleClearinghouse}.)
+This will provide unprecedented access to information about 
+wireless access networks in diverse geographic regions, 
+community roles and environmental impacts of individuals, 
+and social patterns people  all around the world.
+As a result, the \sysname will provide unparalleled research
+capabilities for scientists and researchers across a wide variety of fields
+\end{comment}
+
+Smartphones and tablets in the modern age have powerful capabilities in
+computing, communication, and sensing~\cite{cai2009defending}. Like desktop and
+laptop machines, they can perform complex computing tasks according to user
+commands. These smart devices can also communicate with each other through
+wireless communications. Unlike regular computers, they have embedded
+onboard sensors, such as accelerometer, gyroscope, GPS, and camera, which
+enables the development of innovative mobile applications~\cite{sensor}.
+Although the sensing capabilities enhance the convenience of user interfaces and
+application usefulness, they also raise serious privacy
+concerns~\cite{shabtai2010google}. For instance, through accessing sensor data,
+malicious applications could retrieve sensitive information about the mobile
+phone users, such as location, input passwords, and credit card numbers. They
+even might be able to send these sensitive information to remote
+attackers~\cite{xu2012taplogger, miluzzo2012tapprints, xu2009stealthy,
+schlegel2011soundcomber, cai2011touchlogger, marquardt2011sp}. 
+
+The current access control to the smartphone resources, such as sensor data, is
+static and coarse-grained. We call this \textit{the first defensive line}. Take
+the Android platform as an example, the access permissions are either granted or
+denied completely during the installation of applications based on a request XML
+manifest file. As a result, applications may ask for more permissions than
+needed by the requirement. Once granted the requested permissions, applications
+have access to those resources permanently. Another issue of the current work is
+that they require modifications to the Android platform, such as
+in~\cite{conti2011crepe, hornyack2011these}. This increases the cost of
+maintenance and cannot be used in legacy systems. To protect smartphone
+users' privacy, we propose a \textit{second defensive line} behind the first
+line: a dynamic, fine-grained access control mechanism, which allows to
+define and add privacy filters from user space~\cite{blur, Cappos_CCS_10}.
+
+
+Specifically, we will implement a framework of reference monitors, to enforce
+mandatory access control to sensor data in real time. The subjects of our
+framework will be the processes of applications in user space. The objects will
+be the sensor data on smart devices. If a process of any application needs to
+access any of the sensor data, our second defensive line will come into play,
+mediating every access to sensor data as follows. 
+
+According to the semantics of the access requests and the current context,
+different reference monitors will be triggered, calculating a sensitivity score
+for each request from the applications, which has got through the first
+defensive line. If the request is for highly sensitive sensor data, then the
+request might be simply rejected. Otherwise, if the request is for medium-level
+sensitive sensor data, the request might get through, but the returned data is
+bogus. If the request is for low-sensitive sensor data, then the return results
+need to be processed, e.g., by obfuscation, and the obfuscation ratio is
+proportional to the sensitivity of the request: if the request is more
+sensitive, then the returned data will be obfuscated in a more signiﬁcant way.
+If the request is for non-sensitive sensor data, then the unprocessed sensor
+data will be returned.

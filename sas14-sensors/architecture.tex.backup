@@ -1,0 +1,108 @@
+\section{System Architecture and Threat Model}
+
+In this section, we first briefly describe \sensorname, the basis of \blurname.
+Then we discuss the new extensions to \sensorname for enabling \blurname through
+defining a threat model.
+
+\subsection{Building \sensorname}
+
+The prerequisity of \blurname is to gain access to sensor data. However,
+different devices and platforms, such as Android and iOS, use very different
+interfaces into their sensors. One of the major goals of our testbed is to
+support a wide range of sensor categories, broader device and network diversity,
+while the client software still behave in a portable manner.  
+
+\subsubsection{Seattle Porting onto Mobile Devices}\label{sec-portability}
+Seattle is the testbed platform we have developed over the past four
+years~\cite{Seattlewebpage}. It supports a wide range of devices including
+desktop, laptop, servers, etc. Compared to desktop and laptop environments,
+development on mobile platforms has more difficulties and restrictions due to
+the inherent resource limitations, such as limited computational power and
+battery levels. 
+However, researchers were able to do early stage ports 
+of Seattle to Android~\cite{seattleonandroid} (and jailbroken iPad / iPhone / 
+iPod) with a few weeks of developer effort. Users can now download a 
+native Android installer (APK) from the Google Play 
+store~\cite{seattle-android}. Our Seattle testbed on Android supports Android 
+versions from 2.1 to 4.0.4 (API levels 7 to 15), covering device versions with 
+the highest market distribution~\cite{dashboard-android}.   
+Despite never being advertised or mentioned publicly, our Seattle 
+app in Google Play has more than 50 installs.   While not yet a 
+production-ready release, the proof-of-concept implementations on Android, 
+iPad, iPhone, and OpenWRT home wireless routers, demonstrate
+this is a feasible, low-risk effort.
+
+\subsubsection{Supporting Sensors on Mobile Devices}
+\sensorname is a generic
+sensor reading framework that funnels data from actual sensor drivers,
+implements fine-grained privacy control for the user, and provides generic
+outbound interfaces such as XML-RPC.  
+
+Due to the isolation of the VM, a researcher cannot normally access sensors
+on a user's mobile device, such as GPS, WiFi SSID and signal strength, motion
+sensors (e.g., 
+accelerometer, compass, gyroscope, barometer), etc. However, many users would 
+like a way to provide information about these sensors to selected researchers. 
+To facilitate the exchange of information, we provide an API reads sensor
+data from a Seattle VM for researchers trusted by the user.
+
+However, the APIs provided by native smartphone sensors vary significantly
+across 
+platforms. Our philosophy is to provide a simple API that  
+would allow a variety of sensor applications to operate in a unified manner.
+First, we implemented 
+system hooks called {\it sensor modules} to interact with a variety of 
+sensors through system programming interfaces. Currently, implemented 
+sensor modules and the available contextual information are classified into
+three
+categories: device specific (percentage of battery power level, CPU and memory
+utility), location related (latitude, longitude, altitude, accuracy, and speed
+if available), and network related (mobile network type and operator, nearby
+WiFi access point and Bluetooth devices). While sensor modules are the system
+hooks 
+with read access to valuable sensor resources, they cannot manipulate sensor
+data. 
+Additionally, the sensor API also provides a base {\it registry service} with 
+a common interface which each sensor implementation can easily be plugged 
+into.  For both local and remote processes to access sensor data, an XML-RPC 
+library~\cite{xmlrpc-android} is incorporated to provide data in an unified
+format. In case 
+newer sensors appear on future mobile devices, developers can add newly
+implemented 
+sensors into this framework rather easily. 
+The registry service listens for connection on a set of predefined ports via
+XML-RPC. 
+Thus, both local and remote process can connect to these ports and register for 
+sensor updates. 
+
+Our preliminary work in this area has resulted in working 
+code~\cite{seattle-sensor-git}, tutorials~\cite{seattle-sensor-project}, and a 
+blog for problem discussion~\cite{sensor}. Several different groups have
+already used our early-stage proof-of-concept to solve problems across a variety
+of domains, demonstrating the potential of sharing sensor data. 
+
+\subsection{\blurname Threat Model}
+
+To further motivate our work, we consider three cases in our threat model. The
+first category under consideration is called ambitious legitimate applications.
+In this category, the developers of the applications ask for more permissions
+than needed in the manifest ﬁle for e.g. proﬁt purpose. For example, the
+applications run some hidden code, connecting to remote advertisement servers,
+which analyze smartphone users’ characters based on their behavior patterns.
+Then, the servers will send these users advertisements that they might be
+interested in, to increase the income of those companies who posted the
+advertisements.
+
+The second category is called compromised legitimate applications. In this
+category, the legitimate applications have some vulnerabilities, such as buffer
+overﬂow, so these legitimate applications are actually under the full control of
+remote attackers. The attackers might bypass the ﬁrst defensive line and collect
+sensitive information about the users, such as contacts, credit card numbers,
+and passwords, to jeopardize users’ privacy.
+
+The third category is called malicious applications. These applications are
+designed by attackers with malicious purposes. They behave like benign ones, but
+in fact, they covertly collect users’ private information, like trojans.
+
+Our proposed scheme should be able to detect and defend against all these three
+types of threats above.
