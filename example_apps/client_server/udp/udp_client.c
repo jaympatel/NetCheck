@@ -29,6 +29,7 @@ int set_servinfo(const char* hostname, struct addrinfo** servinfo) {
 
 	return getaddrinfo(hostname, CNXN_PORT, &hints, servinfo);
 }
+
 // use the servinfo linkedlist to get a socket to use
 // set sockfd to the socket that we will use
 //
@@ -48,17 +49,13 @@ struct addrinfo* get_socket_fd(struct addrinfo* servinfo, int* sockfd) {
 	return p;
 }
 
-// Send the shudown message numberous times to ensure
-// that it gets through to the server
+// Send the shudown message to the server
 void send_shutdown_message(int sockfd, const struct addrinfo* p) {
 	int numbytes = -1;
-	int i = 0;
-	for (i = 0; i < 10; i++) {
-		if ((numbytes = sendto(sockfd, SHUTDOWN_MESSAGE, strlen(SHUTDOWN_MESSAGE), 0,
-						p->ai_addr, p->ai_addrlen)) == -1) {
-			perror("udp_client: sendto");
-			exit(1);
-		}
+	if ((numbytes = sendto(sockfd, SHUTDOWN_MESSAGE, strlen(SHUTDOWN_MESSAGE), 0,
+					p->ai_addr, p->ai_addrlen)) == -1) {
+		perror("udp_client: sendto");
+		exit(1);
 	}
 	printf("udp_client: sent \"%s\" to shutdown server\n", SHUTDOWN_MESSAGE);
 }
@@ -86,15 +83,26 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "udp_client: failed to bind socket\n");
 		return 2;
 	}
-	
+
 	// do not need servinfo anymore
 	freeaddrinfo(servinfo);
 
 	int packet_size = 0;
+	int packet_count = 0;
 	for (packet_size = INIT_PACKET_SIZE;
 			packet_size <= MAX_PACKET_SIZE;
 			packet_size += PACKET_SIZE_INCREMENT) {
+		
+		packet_count++;
+		// If we have sent 10 packets already...
+		if (packet_count > 10) {
+			// resent packet_count
+			packet_count = 0;
 
+			// ... then sleep for 10 milliseconds to prevent conjestion
+			sleep(0.01);
+	
+		}
 		// Fill up a buffer of size packet_size with
 		// 'a's to send a packet to server
 		char msg[packet_size];

@@ -1,3 +1,7 @@
+/*
+ ** cnxn_constants.h - Constants used by UDP client and server
+ */
+
 #ifndef _CONNECTION_CONSTANTS_H_
 #define _CONNECTION_CONSTANTS_H_
 
@@ -10,6 +14,6 @@
 // client sends packets based on constants below
 #define INIT_PACKET_SIZE        100
 #define MAX_PACKET_SIZE         4800
-#define PACKET_SIZE_INCREMENT  100
+#define PACKET_SIZE_INCREMENT   100
 
 #endif // _CONNECTION_CONSTANTS_H_
