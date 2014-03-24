@@ -3,8 +3,8 @@ Gurkaran Singh Poonia
 Start Date: March 23, 2014
 
 - This file contains unit doc tests for the functions in mtu_diagnosis.py.
-- To run the tests, simply run this file 
-  (e.g., from the command line, run: python mtu_diagnosis_unit_tests.py)
+- To run the tests, run the following command from the netcheck/ directory:
+  'python -m tests.unit_tests.mtu_diagnosis_unit_tests'
 
 - Also note that the functions below are not necessary, the tests
   are divided as such simply for clarity.
