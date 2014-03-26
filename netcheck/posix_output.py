@@ -14,6 +14,7 @@ import model_network_syscalls as model
 from ip_matching import format_addr
 from ip_matching import addr_dont_care
 from ip_matching import is_addr_match
+from mtu_diagnosis import check_mtu_issue
 
 
 
@@ -615,6 +616,14 @@ def check_udp_buffers():
     return []
 
   connection_dict = {}
+  errors = []
+
+  # The two dicts below are used to store the list of tuples required by the mtu_diagnosis 
+  # module in order to diagnosis MTU issues. The dicts will contain lists of tuples for each 
+  # connection (as in connection_dict). The lists will get populated from within the for loops below.
+  # The tuples are populated (per message) as: (packets_sent, packets_lost, packet_size)
+  check_mtu_accept_tuples = {}
+  check_mtu_connect_tuples = {}
 
   # We care counting data sent and data lost per pair of addresses, and
   # we are tracking both total number of bytes sent/lost and total number
@@ -634,10 +643,19 @@ def check_udp_buffers():
     if accept_tuple not in connection_dict:
       connection_dict[accept_tuple] = {'sent': 0, 'lost': 0, 'bytes_sent': 0, 'bytes_lost': 0}
 
+    # Add the empty list into the MTU check dicts to populate it with the appropriate packet
+    # tuples for each of the connect_tuple/accept_tuples.
+    if accept_tuple not in check_mtu_accept_tuples:
+      check_mtu_accept_tuples[accept_tuple] = []
+    if connect_tuple not in check_mtu_connect_tuples:
+      check_mtu_connect_tuples[connect_tuple] = []
+
     for m in t['a_dtgrams']:
       connection_dict[accept_tuple]['sent'] += t['a_dtgrams'][m][0]
       connection_dict[accept_tuple]['bytes_sent'] += t['a_dtgrams'][m][0] * len(m)
       unreceived = t['a_dtgrams'][m][0] - t['a_dtgrams'][m][1]
+      # Add the (packets_sent, packets_lost, packet_size) tuple to the list for MTU diagnosis analysis
+      check_mtu_accept_tuples[accept_tuple].append((t['a_dtgrams'][m][0], unreceived, len(m)))
       if unreceived > 0:
         connection_dict[accept_tuple]['lost'] += unreceived
         connection_dict[accept_tuple]['bytes_lost'] += unreceived * len(m)
@@ -646,11 +664,12 @@ def check_udp_buffers():
       connection_dict[connect_tuple]['sent'] += t['c_dtgrams'][m][0]
       connection_dict[connect_tuple]['bytes_sent'] += t['c_dtgrams'][m][0] * len(m)
       unreceived = t['c_dtgrams'][m][0] - t['c_dtgrams'][m][1]
+      # Add the (packets_sent, packets_lost, packet_size) tuple to the list for MTU diagnosis analysis
+      check_mtu_connect_tuples[connect_tuple].append((t['c_dtgrams'][m][0], unreceived, len(m)))
       if unreceived > 0:
         connection_dict[connect_tuple]['lost'] += unreceived
         connection_dict[connect_tuple]['bytes_lost'] += unreceived * len(m)
 
-  errors = []
 
   if PRINT_STATISTICS:
     print
@@ -687,11 +706,18 @@ def check_udp_buffers():
       if addr_dict['bytes_lost']:
         print "(%.2f%%)" % (100.0 * addr_dict['bytes_lost'] / addr_dict['bytes_sent']),
       print
-
+     
       # We only report an error in the trace summary if all datagrams were lost
       if addr_dict['lost'] == addr_dict['sent']:
         errors.append("[Possible Network Misbehavior] All " + str(addr_dict['sent']) +
             " datagrams sent from " + sender_str + " to " + receiver_str + " were lost")
+
+      # If the packet analysis suggests an MTU issue, then report it
+      # The constants for determining an MTU issue are found in diagnosis_constants.py
+      if check_mtu_issue(check_mtu_accept_tuples[(receiver, sender)], check_mtu_connect_tuples[(sender, receiver)]):
+          errors.append(("[Possible MTU issue] Messages sent from " 
+                  + sender_str + " to " + receiver_str + " indicate that an MTU issue" + 
+                  " may have occured over the network"))
 
   return errors
 
