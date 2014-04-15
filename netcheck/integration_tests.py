@@ -1,12 +1,53 @@
 #! /usr/bin/env python
-#
-# Gurkaran Singh Poonia
-# Start Date: March 24, 2014
-#
-# Purpose: Run integration tests for NetCheck
-#
-# NOTE: Assumes that the system running this is Linux and 
-# has the 'wget' shell tool available.
+
+"""
+Gurkaran Singh Poonia
+Start Date: March 24, 2014
+
+This file runs integration tests on NetCheck. There are 3 action arguments [-d, -e, -t].
+The user must specify exactly 1 of these every time integration_tests.py is run.
+
+The 3 Action Arguments:
+
+1) Download Traces (-d, --download):
+   - downloads traces (that will be used to run NetCheck) using the 'wget' tool.
+   - either (if config file is specified by '-c') parses config file to determine trace names.
+   - otherwise uses the REMOTE_BASE and REMOTE_TRACE_SETS constants specified below.
+   - the default directory to save the downloaded traces to is 'program_traces/'.
+
+2) Generate Expected Outputs (-e, --expected):
+   - generates expected outputs of NetCheck
+   - assumes that the NetCheck version this runs on is semantically correct
+   - if no config file is provided (via the '-c' argument), then this will run NetCheck using 
+     the '-u' argument.
+
+3) Test Current Version of NetCheck (-t, --test):
+   - tests the output of NetCheck against expected outputs using the 'diff' tool.
+   - if no config file is provided (via the '-c' argument), then this will run NetCheck using 
+     the '-u' argument.
+   - the default directory to find expected outputs in is 'expected_outputs/'
+
+----------------------
+
+Using Config Files (-c, --configfile):
+- used to specify a NetCheck config file. 
+- the configfile is used for the 3 cases above as follows:
+
+1) Download traces:
+   In this case, integration_tests.py will parse the provided config file and determine
+   which traces to download. It will NOT use the constants REMOTE_BASE, and REMOTE_TRACE_SETS.
+
+2) Generate Expected Outputs and Test NetCheck:
+   In both of these cases, integration_tests.py will use the config file for running
+   NetCheck, instead of using the '-u' argument to run NetCheck.
+
+---------------------
+
+Assumptions and Dependencies:
+1) Since integration_tests.py uses the 'wget' and 'diff' command line tools,
+   the user should have these tools installed and run integration_tests.py in a 
+   Linux environment (cygwin also works).
+"""
 
 from shutil import copy
 import subprocess as sp
@@ -17,7 +58,11 @@ import os, sys
 # Main functions for the 3 options/arguments
 ##############################################
 
+# a string indicating the root base URL of the traces to be downloaded
 REMOTE_BASE = 'http://blackbox.poly.edu/program_traces/semantic_traces/'
+
+# a list of tuples, where each tuple has the trace names that will be used 
+# together to run NetCheck. All traces in this list are downloaded.
 REMOTE_TRACE_SETS = [ 
       ('close_block_recv.strace.client.linux','close_block_recv.strace.server.linux'),
       ('conn_progress_recv.strace.linux.client','conn_progress_recv.strace.linux.server')
@@ -26,7 +71,7 @@ REMOTE_TRACE_SETS = [
 def download_traces(traces_dir, config_filename):
    """
    Download traces from the remote location specified in the constants
-   REMOTE_BASE and REMOTE_TRACE_SETS.
+   REMOTE_BASE and REMOTE_TRACE_SETS or the config file argument.
    Save the downloaded traces in the traces_dir directory provided by user.
    """
    if config_filename != None:
@@ -54,6 +99,9 @@ def download_traces(traces_dir, config_filename):
 
 
 def generate_expected(traces_dir, exp_dir, config_filename):
+   """
+   Run NetCheck and save the outputs in the exp_dir directory provided by user.
+   """
    if config_filename != None:
       print 'TODO: Expected from Config:', traces_dir, exp_dir
    else:
@@ -95,6 +143,10 @@ def generate_expected(traces_dir, exp_dir, config_filename):
       print 'Completed generating expected outputs'
 
 def generate_test(exp_dir, config_filename):
+   """
+   Run NetCheck and compare output against the expected output (obtained from the
+   exp_dir provided by user).
+   """
    if config_filename != None:
       print 'TODO: Test from Config:', exp_dir
    else:
@@ -108,6 +160,9 @@ def generate_test(exp_dir, config_filename):
 
 
 def init_options(parser):
+   """
+   Initialize the command line options for this script.
+   """
    DFLT_DWNLD_DIR = 'program_traces'
    DFLT_TEST_DIR = 'expected_outputs'
 
@@ -127,18 +182,31 @@ def init_options(parser):
    parser.add_argument('-c', '--configfile',nargs='?',metavar=('CONFIG_FILE'),type=str,help=hlp_c)
 
 
+def normalize_dir(dir_name):
+   """
+   Removes the '/' from the end of dir_name is it exists.
+   Returns the normalized directory name
+   """
+   if (dir_name[-1] == os.sep):
+      dir_name = dir_name[:-1]
+
+   return dir_name
+
+
 def too_many_args(args):
+   """
+   Return True is user passed in more than 1 action argument, False otherwise
+   """
    download = args.download != None 
    expected = args.expected != None
    test = args.test != None
 
-   # XOR the input arguments to determine if more than 1 was passed
-   if   (download != (expected or test)) \
-	 and (expected != (download or test)) \
-	 and (test != (download or expected)):
+   if (download and (expected or test)) \
+	 or (expected and (download or test)) \
+	 or (test and (download or expected)):
       return True
    else:
-      return True
+      return False
 
 
 ##############################################
@@ -153,19 +221,20 @@ if __name__ == "__main__":
    args = parser.parse_args()
 
    if too_many_args(args):
-      err = 'Please specify exactly 1 action argument. Use the -h argument for help'
+      err = 'Too Many Action Arguments. '
+      err += 'Please specify exactly 1 action argument. Use the -h argument for help'
       print err
       sys.exit(1)
 
    if args.download != None:
-      download_traces(args.download, args.configfile)
+      download_traces(normalize_dir(args.download), args.configfile)
       sys.exit(0)
    elif args.expected != None:
-      generate_expected(args.expected[0], args.expected[1], args.configfile)
+      generate_expected(normalize_dir(args.expected[0]), normalize_dir(args.expected[1]), args.configfile)
       sys.exit(0)
    elif args.test != None:
-      generate_test(args.test, args.configfile)
+      generate_test(normalize_dir(args.test), args.configfile)
       sys.exit(0)
    else:
-      print 'Please pass exactly 1 action argument. Use the -h argument for help'
+      print 'Please specify exactly 1 action argument. Use the -h argument for help'
       sys.exit(1)
