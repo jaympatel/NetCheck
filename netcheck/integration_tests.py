@@ -25,7 +25,6 @@ The 3 Action Arguments:
    - tests the output of NetCheck against expected outputs using the 'diff' tool.
    - if no config file is provided (via the '-c' argument), then this will run NetCheck using 
      the '-u' argument.
-   - the default directory to find expected outputs in is 'expected_outputs/'
 
 ----------------------
 
@@ -106,7 +105,7 @@ def generate_expected(traces_dir, exp_dir, config_filename):
       print 'TODO: Expected from Config:', traces_dir, exp_dir
    else:
       path = os.path.dirname(os.path.abspath(__file__))
-      subdirs = [name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
+      subdirs = get_subdirs(path)
 
       if (traces_dir not in subdirs):
          print 'Expected %s sub-directory, but it does not exist' % traces_dir
@@ -128,10 +127,10 @@ def generate_expected(traces_dir, exp_dir, config_filename):
          cmd.extend(trace_set[:])
          output = sp.check_output(cmd, stderr=sp.STDOUT)
          if output == '':
-      	  print 'Error running NetCheck on:', trace_set
+      	  print 'Error running NetCheck on: ', trace_set
          else:
       	  os.chdir(path + ext_exp_dir)
-      	  f = open('test' + str(i) + '.txt', 'w')
+      	  f = open('expected_output-' + str(i) + '.txt', 'w')
       	  i += 1
       	  f.write(output)
       	  f.close()
@@ -142,7 +141,7 @@ def generate_expected(traces_dir, exp_dir, config_filename):
 
       print 'Completed generating expected outputs'
 
-def generate_test(exp_dir, config_filename):
+def generate_test(traces_dir, exp_dir, config_filename):
    """
    Run NetCheck and compare output against the expected output (obtained from the
    exp_dir provided by user).
@@ -150,9 +149,106 @@ def generate_test(exp_dir, config_filename):
    if config_filename != None:
       print 'TODO: Test from Config:', exp_dir
    else:
-      todo = 'TODO: Implement generate_test(). Need to check output of Netcheck with the'
-      todo += ' expected output generated previously.'
-      print todo
+      path = os.path.dirname(os.path.abspath(__file__))
+      subdirs = get_subdirs(path)
+      if (traces_dir not in subdirs):
+         print 'Expected %s sub-directory, but it does not exist' % traces_dir
+         sys.exit(1)
+      elif (exp_dir not in subdirs):
+         print 'Expected %s sub-directory, but it does not exist' % exp_dir
+         sys.exit(1)
+      else:
+         ext_exp_dir = os.sep + exp_dir
+         test_results = 'integration_test_results'
+         ext_test_results = os.sep + test_results
+         if (test_results not in subdirs):
+            os.mkdir(path + ext_test_results)
+
+      print 'Creating current NetCheck outputs...'
+
+      i = 0
+      for trace_set in REMOTE_TRACE_SETS:
+         for trace in trace_set:
+           src = path + os.sep + traces_dir + os.sep + trace
+           copy(src, path + os.sep + trace)
+
+         cmd = ['python', 'netcheck.py', '-u']
+         cmd.extend(trace_set[:])
+         output = sp.check_output(cmd, stderr=sp.STDOUT)
+         if output == '':
+           print 'Error running NetCheck on: ', trace_set
+         else:
+           os.chdir(path + ext_exp_dir)
+           f = open('current_output-' + str(i) + '.txt', 'w')
+           i += 1
+           f.write(output)
+           f.close()
+           os.chdir(path)
+
+         for trace in trace_set:
+            os.remove(path + os.sep + trace)
+
+      os.chdir(path + ext_exp_dir)
+      files = get_files(path + ext_exp_dir)
+      output_dict = create_output_tuples(files)
+
+      print 'Completed creating NetCheck outputs'
+      print
+      print 'Testing current NetCheck output against the expected NetCheck output...'
+
+      test_fail = False
+      for output_num, output_files in output_dict.iteritems():
+         cur_output_file = output_files[0]
+         exp_output_file = output_files[1]
+         cmd = ['diff', exp_output_file, cur_output_file]
+         try:
+            shell_output = sp.check_output(cmd, stderr=sp.STDOUT)
+         except sp.CalledProcessError as e:
+            os.chdir(path + ext_test_results)
+            f = open('diff_outputs-' + str(output_num) + '.txt', 'w')
+            f.write(e.output)
+            f.close()
+            os.chdir(path + ext_exp_dir)
+            test_fail = True
+         
+      print 'Completed testing NetCheck outputs'
+
+      print
+      print '------------------ RESULT -----------------'
+      if test_fail:
+         print 'NetCheck did not pass the integration tests. Please see the diff_output files in \'%s\' for more information' % test_results
+      else:
+         print 'NetCheck passed the intergration tests!'
+      print '-------------------------------------------'
+
+def create_output_tuples(files):
+   """
+   Return a dict of current output and the corresponding expected output files.
+   Key:   The Number of the files [0,1,...]
+   Value: A List of the files as [current output file, expected output file]
+   """
+   output_dict = {}
+   
+   for file_name in sorted(files):
+      key = file_name.split('-')[-1].split('.')[0]
+      if key in output_dict:
+         output_dict[key].append(file_name)
+      else:
+         output_dict[key] = [file_name]
+
+   return output_dict
+
+def get_subdirs(current_dir):
+   """
+   Returns a list of all the subdirectories in current_dir
+   """
+   return [name for name in os.listdir(current_dir) if os.path.isdir(os.path.join(current_dir, name))]
+
+def get_files(current_dir):
+   """
+   Returns a list of all the files in current_dir
+   """
+   return [name for name in os.listdir(current_dir) if os.path.isfile(os.path.join(current_dir, name))]
 
 ##############################################
 # Helper functions for option/argument parsing
@@ -164,21 +260,19 @@ def init_options(parser):
    Initialize the command line options for this script.
    """
    DFLT_DWNLD_DIR = 'program_traces'
-   DFLT_TEST_DIR = 'expected_outputs'
 
    hlp_d = 'Download the program traces and save them in the specified directory. '
    hlp_d += 'Default value is "' + DFLT_DWNLD_DIR + '"'
    
    hlp_e = 'Generate the expected NetCheck output from the downloaded program traces.'
 
-   hlp_t = 'Test NetCheck against the generated expected outputs to be found in the specified directory. '
-   hlp_t += 'Default value is "' + DFLT_TEST_DIR + '"'
+   hlp_t = 'Test NetCheck against the generated expected outputs to be found in the specified directory.'
 
    hlp_c = 'If this argument is passed, then the program will use the config file for getting traces or running NetCheck.'
 
    parser.add_argument('-d', '--download',nargs='?',const=DFLT_DWNLD_DIR,metavar=('DOWNLOAD_DIRECTORY'),type=str,help=hlp_d)
    parser.add_argument('-e', '--expected',nargs=2,metavar=('TRACES_DIRECTORY', 'OUTPUT_DIRECTORY'),type=str,help=hlp_e)
-   parser.add_argument('-t', '--test',nargs='?',const=DFLT_TEST_DIR,metavar=('EXPECTED_OUTPUTS_DIRECTORY'),type=str,help=hlp_t)   
+   parser.add_argument('-t', '--test',nargs=2,metavar=('TRACES_DIRECTORY', 'EXPECTED_OUTPUTS_DIRECTORY'),type=str,help=hlp_t)   
    parser.add_argument('-c', '--configfile',nargs='?',metavar=('CONFIG_FILE'),type=str,help=hlp_c)
 
 
@@ -233,7 +327,7 @@ if __name__ == "__main__":
       generate_expected(normalize_dir(args.expected[0]), normalize_dir(args.expected[1]), args.configfile)
       sys.exit(0)
    elif args.test != None:
-      generate_test(normalize_dir(args.test), args.configfile)
+      generate_test(normalize_dir(args.test[0]), normalize_dir(args.test[1]), args.configfile)
       sys.exit(0)
    else:
       print 'Please specify exactly 1 action argument. Use the -h argument for help'
