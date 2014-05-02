@@ -11,7 +11,8 @@ The 3 Action Arguments:
 
 1) Download Traces (-d, --download):
    - downloads traces (that will be used to run NetCheck) using the 'wget' tool.
-   - either (if config file is specified by '-c') parses config file to determine trace names.
+   - either (if config file is specified by '-c') parses config file to determine trace names
+     and uses REMOTE_BASE as the remote base.
    - otherwise uses the REMOTE_BASE and REMOTE_TRACE_SETS constants specified below.
    - the default directory to save the downloaded traces to is 'program_traces/'.
 
@@ -23,6 +24,8 @@ The 3 Action Arguments:
 
 3) Test Current Version of NetCheck (-t, --test):
    - tests the output of NetCheck against expected outputs using the 'diff' tool.
+   - saves output of all 'diff's in integration_test_results/ if the outputs differ.
+   - Reports integration tests as fail if any outputs differ, pass if all outputs are the same
    - if no config file is provided (via the '-c' argument), then this will run NetCheck using 
      the '-u' argument.
 
@@ -48,7 +51,7 @@ Assumptions and Dependencies:
    Linux environment (cygwin also works).
 """
 
-from shutil import copy
+from shutil import copy, move
 import subprocess as sp
 import os, sys
 
@@ -58,7 +61,7 @@ import os, sys
 ##############################################
 
 # a string indicating the root base URL of the traces to be downloaded
-REMOTE_BASE = 'http://blackbox.poly.edu/program_traces/semantic_traces/'
+REMOTE_BASE = 'http://blackbox.poly.edu/program_traces/semantics/'
 
 # a list of tuples, where each tuple has the trace names that will be used 
 # together to run NetCheck. All traces in this list are downloaded.
@@ -70,156 +73,243 @@ REMOTE_TRACE_SETS = [
 def download_traces(traces_dir, config_filename):
    """
    Download traces from the remote location specified in the constants
-   REMOTE_BASE and REMOTE_TRACE_SETS or the config file argument.
+   REMOTE_BASE and either REMOTE_TRACE_SETS or the config file argument.
    Save the downloaded traces in the traces_dir directory provided by user.
    """
-   if config_filename != None:
-      print 'TODO: Download from Config:', traces_dir
+   use_config_file = config_filename != None
+
+   # If using config file, then fetch trace names from the config file
+   if use_config_file:
+      remote_traces = get_trace_names(config_filename)
+   # otherwise use the constant in this file
    else:
-      path = os.path.dirname(os.path.abspath(__file__))
-      subdirs = [name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
-      ext_traces_dir = os.sep + traces_dir
+      remote_traces = REMOTE_TRACE_SETS
 
-      if (traces_dir in subdirs):
-         os.chdir(path + ext_traces_dir)
-      else:
-         os.mkdir(path + ext_traces_dir)
-         os.chdir(path + ext_traces_dir)
+   path = get_path()
+   subdirs = get_subdirs(path)
+   ext_traces_dir = os.sep + traces_dir
 
-      print 'Downloading traces...'
-
-      for trace_set in REMOTE_TRACE_SETS:
-         for trace in trace_set:
-      	  trace = REMOTE_BASE + trace 
-      	  if (sp.call(['wget', '-q', '-nc', trace]) != 0):
-      	     print 'Error retreiving file:', trace
-
-      print 'Successfully downloaded all traces'
-
-
-def generate_expected(traces_dir, exp_dir, config_filename):
-   """
-   Run NetCheck and save the outputs in the exp_dir directory provided by user.
-   """
-   if config_filename != None:
-      print 'TODO: Expected from Config:', traces_dir, exp_dir
+   # if the directory with traces exists, then chdir to it
+   if (traces_dir in subdirs):
+      os.chdir(path + ext_traces_dir)
+   # otherwise make that directory and chdir to it
    else:
-      path = os.path.dirname(os.path.abspath(__file__))
-      subdirs = get_subdirs(path)
+      os.mkdir(path + ext_traces_dir)
+      os.chdir(path + ext_traces_dir)
 
-      if (traces_dir not in subdirs):
-         print 'Expected %s sub-directory, but it does not exist' % traces_dir
-         sys.exit(1)
+   print 'Downloading traces...'
+
+   # get the all specfied traces (specified in remote_traces)
+   # from the REMOTE_BASE constant
+   for trace_set in remote_traces:
+      for trace in trace_set:
+   	  trace = REMOTE_BASE + trace 
+   	  if (sp.call(['wget', '-q', '-nc', trace]) != 0):
+   	     print 'Error retreiving file:', trace
+
+   print 'Successfully downloaded all traces'
+
+
+def generate_expected(traces_dir, output_dir, config_filename):
+   """
+   Run NetCheck and save the outputs in the output_dir directory provided by user.
+   """
+   use_config_file = config_filename != None
+
+   path = get_path()
+   subdirs = get_subdirs(path)
+
+   # if traces directory is not a subdirectory, then report error and exit
+   if (traces_dir not in subdirs):
+      print 'Expected %s sub-directory, but it does not exist' % traces_dir
+      sys.exit(1)
+
+   # if the outputs directory does not exist, then create it
+   ext_output_dir = os.sep + output_dir
+   if (output_dir not in subdirs):
+	   os.mkdir(path + ext_output_dir)
+
+   print 'Generating expected output from traces in ' + traces_dir + '...'
+
+   # If using config file, then fetch trace names from the config file
+   if use_config_file:
+      traces = get_trace_names(config_filename)
+   # otherwise use the constant in this file
+   else:
+      traces = REMOTE_TRACE_SETS
+
+   # loop through the trace sets and run NetCheck on all of them.
+   i = 0
+   for trace_set in traces:
+      
+      # copy all the traces from the traces_dir into NetCheck's working directory
+      for trace in trace_set:
+   	  src = path + os.sep + traces_dir + os.sep + trace
+   	  copy(src, path + os.sep + trace)
+
+      if use_config_file:
+         cmd = ['python', 'netcheck.py', config_filename]
       else:
-         ext_exp_dir = os.sep + exp_dir
-         if (exp_dir not in subdirs):
-   	      os.mkdir(path + ext_exp_dir)
-
-      print 'Generating expected output from traces in ' + traces_dir + '...'
-
-      i = 0
-      for trace_set in REMOTE_TRACE_SETS:
-         for trace in trace_set:
-      	  src = path + os.sep + traces_dir + os.sep + trace
-      	  copy(src, path + os.sep + trace)
-
          cmd = ['python', 'netcheck.py', '-u']
          cmd.extend(trace_set[:])
-         output = sp.check_output(cmd, stderr=sp.STDOUT)
-         if output == '':
-      	  print 'Error running NetCheck on: ', trace_set
-         else:
-      	  os.chdir(path + ext_exp_dir)
-      	  f = open('expected_output-' + str(i) + '.txt', 'w')
-      	  i += 1
-      	  f.write(output)
-      	  f.close()
-      	  os.chdir(path)
+      
+      # run Netcheck and save the output in the specified directory in file
+      output = sp.check_output(cmd, stderr=sp.STDOUT)
+      if output == '':
+   	  print 'Error running NetCheck on: ', trace_set
+      else:
+   	  os.chdir(path + ext_output_dir)
+   	  f = open('expected_output-' + str(i) + '.txt', 'w')
+   	  i += 1
+   	  f.write(output)
+   	  f.close()
+   	  os.chdir(path)
 
-         for trace in trace_set:
-   	      os.remove(path + os.sep + trace)
+      # done with the traces, so remove them from NetCheck's working directory
+      for trace in trace_set:
+	      os.remove(path + os.sep + trace)
 
-      print 'Completed generating expected outputs'
+   print 'Completed generating expected outputs'
 
-def generate_test(traces_dir, exp_dir, config_filename):
+
+def generate_test(traces_dir, output_dir, config_filename):
    """
    Run NetCheck and compare output against the expected output (obtained from the
-   exp_dir provided by user).
+   output_dir provided by user).
    """
-   if config_filename != None:
-      print 'TODO: Test from Config:', exp_dir
+   use_config_file = config_filename != None
+
+   path = get_path()
+   subdirs = get_subdirs(path)
+
+   # if traces directory is not a subdirectory, then report error and exit
+   if (traces_dir not in subdirs):
+      print 'Expected %s sub-directory, but it does not exist' % traces_dir
+      sys.exit(1)
+
+   # if output directory is not a subdirectory, then report error and exit
+   if (output_dir not in subdirs):
+      print 'Expected %s sub-directory, but it does not exist' % output_dir
+      sys.exit(1)
    else:
-      path = os.path.dirname(os.path.abspath(__file__))
-      subdirs = get_subdirs(path)
-      if (traces_dir not in subdirs):
-         print 'Expected %s sub-directory, but it does not exist' % traces_dir
-         sys.exit(1)
-      elif (exp_dir not in subdirs):
-         print 'Expected %s sub-directory, but it does not exist' % exp_dir
-         sys.exit(1)
+      ext_output_dir = os.sep + output_dir
+
+   # if the integration_test_results dir does not exist, then create it
+   test_results = 'integration_test_results'
+   ext_test_results = os.sep + test_results
+   if (test_results not in subdirs):
+      os.mkdir(path + ext_test_results)
+
+   print 'Creating current NetCheck outputs...'
+
+   # If using config file, then fetch trace names from the config file
+   if use_config_file:
+      traces = get_trace_names(config_filename)
+   # otherwise use the constant in this file
+   else:
+      traces = REMOTE_TRACE_SETS
+
+   i = 0
+   for trace_set in traces:
+      for trace in trace_set:
+        src = path + os.sep + traces_dir + os.sep + trace
+        copy(src, path + os.sep + trace)
+
+      if use_config_file:
+         cmd = ['python', 'netcheck.py', config_filename]
       else:
-         ext_exp_dir = os.sep + exp_dir
-         test_results = 'integration_test_results'
-         ext_test_results = os.sep + test_results
-         if (test_results not in subdirs):
-            os.mkdir(path + ext_test_results)
-
-      print 'Creating current NetCheck outputs...'
-
-      i = 0
-      for trace_set in REMOTE_TRACE_SETS:
-         for trace in trace_set:
-           src = path + os.sep + traces_dir + os.sep + trace
-           copy(src, path + os.sep + trace)
-
          cmd = ['python', 'netcheck.py', '-u']
          cmd.extend(trace_set[:])
-         output = sp.check_output(cmd, stderr=sp.STDOUT)
-         if output == '':
-           print 'Error running NetCheck on: ', trace_set
-         else:
-           os.chdir(path + ext_exp_dir)
-           f = open('current_output-' + str(i) + '.txt', 'w')
-           i += 1
-           f.write(output)
-           f.close()
-           os.chdir(path)
 
-         for trace in trace_set:
-            os.remove(path + os.sep + trace)
-
-      os.chdir(path + ext_exp_dir)
-      files = get_files(path + ext_exp_dir)
-      output_dict = create_output_tuples(files)
-
-      print 'Completed creating NetCheck outputs'
-      print
-      print 'Testing current NetCheck output against the expected NetCheck output...'
-
-      test_fail = False
-      for output_num, output_files in output_dict.iteritems():
-         cur_output_file = output_files[0]
-         exp_output_file = output_files[1]
-         cmd = ['diff', exp_output_file, cur_output_file]
-         try:
-            shell_output = sp.check_output(cmd, stderr=sp.STDOUT)
-         except sp.CalledProcessError as e:
-            os.chdir(path + ext_test_results)
-            f = open('diff_outputs-' + str(output_num) + '.txt', 'w')
-            f.write(e.output)
-            f.close()
-            os.chdir(path + ext_exp_dir)
-            test_fail = True
-         
-      print 'Completed testing NetCheck outputs'
-
-      print
-      print '------------------ RESULT -----------------'
-      if test_fail:
-         print 'NetCheck did not pass the integration tests. Please see the diff_output files in \'%s\' for more information' % test_results
+      output = sp.check_output(cmd, stderr=sp.STDOUT)
+      if output == '':
+        print 'Error running NetCheck on: ', trace_set
       else:
-         print 'NetCheck passed the intergration tests!'
-      print '-------------------------------------------'
+        os.chdir(path + ext_output_dir)
+        f = open('current_output-' + str(i) + '.txt', 'w')
+        i += 1
+        f.write(output)
+        f.close()
+        os.chdir(path)
+
+      for trace in trace_set:
+         os.remove(path + os.sep + trace)
+
+   os.chdir(path + ext_output_dir)
+   files = get_files(path + ext_output_dir)
+   output_dict = create_output_tuples(files)
+
+   print 'Completed creating NetCheck outputs'
+   print
+   print 'Testing current NetCheck output against the expected NetCheck output...'
+
+   test_fail = False
+   for output_num, output_files in output_dict.iteritems():
+      cur_output_file = output_files[0]
+      exp_output_file = output_files[1]
+      cmd = ['diff', exp_output_file, cur_output_file]
+      try:
+         shell_output = sp.check_output(cmd, stderr=sp.STDOUT)
+      except sp.CalledProcessError as e:
+         os.chdir(path + ext_test_results)
+         f = open('diff_outputs-' + str(output_num) + '.txt', 'w')
+         f.write(e.output)
+         f.close()
+         os.chdir(path + ext_output_dir)
+         test_fail = True
+      
+   print 'Completed testing NetCheck outputs'
+
+   print
+   print '------------------ RESULT -----------------'
+   if test_fail:
+      print 'NetCheck did not pass the integration tests. Please see the diff_output files in \'tests/integration_tests/%s\' for more information' % test_results
+   else:
+      print 'NetCheck passed the intergration tests!'
+   print '-------------------------------------------'
+
+   clean_up(path + os.sep + traces_dir, path + ext_output_dir, path + ext_test_results)
+
+
+def get_trace_names(config_filename):
+   """
+   Returns a list with a single tuple in it. 
+   The tuple is of the traces that are used in the config file.
+   """
+   traces = []
+   f = open(config_filename, 'U')
+   for line in f:
+      if line.strip() != '':
+         if 'trace' in line:
+            trace_name = line.strip().split(' ')[1]
+            traces.append(trace_name)
+   return [tuple(traces)]
+
+
+##############################################
+# Helper functions for the 3 action arguments
+##############################################
+
+def get_path():
+   """
+   Return the path to the current directory
+   """
+   return os.path.dirname(os.path.abspath(__file__))
+
+
+def get_subdirs(current_dir):
+   """
+   Returns a list of all the subdirectories in current_dir
+   """
+   return [name for name in os.listdir(current_dir) if os.path.isdir(os.path.join(current_dir, name))]
+
+
+def get_files(current_dir):
+   """
+   Returns a list of all the files in current_dir
+   """
+   return [name for name in os.listdir(current_dir) if os.path.isfile(os.path.join(current_dir, name))]
+
 
 def create_output_tuples(files):
    """
@@ -238,22 +328,32 @@ def create_output_tuples(files):
 
    return output_dict
 
-def get_subdirs(current_dir):
-   """
-   Returns a list of all the subdirectories in current_dir
-   """
-   return [name for name in os.listdir(current_dir) if os.path.isdir(os.path.join(current_dir, name))]
 
-def get_files(current_dir):
+def clean_up(traces_path, output_path, integ_results_path):
    """
-   Returns a list of all the files in current_dir
+   Move all the integration tests related directories to the appropriate spot
+   (i.e., under tests/integration_tests)
    """
-   return [name for name in os.listdir(current_dir) if os.path.isfile(os.path.join(current_dir, name))]
+   path = get_path()
+
+   # create a time-stamp based folder to store all integration tests results
+   results_folder_name = get_time_stamp()
+   results_folder_path = path + os.sep + 'tests' + os.sep + 'integration_tests' + os.sep + results_folder_name
+   os.mkdir(results_folder_path)
+   move(traces_path, results_folder_path)
+   move(output_path, results_folder_path)
+   move(integ_results_path, results_folder_path)
+
+def get_time_stamp():
+   """
+   Returns the current time stamp 
+   """
+   from time import gmtime, strftime
+   return strftime("%Y-%m-%d-%H-%M-%S", gmtime())
 
 ##############################################
 # Helper functions for option/argument parsing
 ##############################################
-
 
 def init_options(parser):
    """
@@ -272,7 +372,7 @@ def init_options(parser):
 
    parser.add_argument('-d', '--download',nargs='?',const=DFLT_DWNLD_DIR,metavar=('DOWNLOAD_DIRECTORY'),type=str,help=hlp_d)
    parser.add_argument('-e', '--expected',nargs=2,metavar=('TRACES_DIRECTORY', 'OUTPUT_DIRECTORY'),type=str,help=hlp_e)
-   parser.add_argument('-t', '--test',nargs=2,metavar=('TRACES_DIRECTORY', 'EXPECTED_OUTPUTS_DIRECTORY'),type=str,help=hlp_t)   
+   parser.add_argument('-t', '--test',nargs=2,metavar=('TRACES_DIRECTORY', 'OUTPUT_DIRECTORY'),type=str,help=hlp_t)   
    parser.add_argument('-c', '--configfile',nargs='?',metavar=('CONFIG_FILE'),type=str,help=hlp_c)
 
 
