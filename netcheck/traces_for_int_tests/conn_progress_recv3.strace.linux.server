@@ -1,0 +1,20 @@
+set_robust_list(0xb70e9bb0, 0xc)        = 0
+time(NULL)                              = 1346426699
+open("/sys/devices/system/cpu/online", O_RDONLY|O_CLOEXEC) = 3
+read(3, "0\n", 8192)                    = 2
+close(3)                                = 0
+mmap2(NULL, 2097152, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0xb66e9000
+munmap(0xb66e9000, 94208)               = 0
+munmap(0xb6800000, 954368)              = 0
+mprotect(0xb6700000, 135168, PROT_READ|PROT_WRITE) = 0
+futex(0x9c37f78, FUTEX_WAKE_PRIVATE, 1) = 1
+futex(0x9c1c700, FUTEX_WAKE_PRIVATE, 1) = 1
+socket(PF_INET, SOCK_STREAM, IPPROTO_IP) = 3
+bind(3, {sa_family=AF_INET, sin_port=htons(45961), sin_addr=inet_addr("127.0.0.1")}, 16) = 0
+listen(3, 1)                            = 0
+accept(3, {sa_family=AF_INET, sin_port=htons(52139), sin_addr=inet_addr("127.0.0.1")}, [16]) = 4
+close(4)                                = 0
+select(0, NULL, NULL, NULL, {3, 0})     = 0 (Timeout)
+close(3)                                = 0
+futex(0x9c38808, FUTEX_WAKE_PRIVATE, 1) = 1
+futex(0x9c1c700, FUTEX_WAKE_PRIVATE, 1) = 1

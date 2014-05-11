@@ -1,0 +1,29 @@
+--------------------------------------------------------------------------------
+Configuration
+--------------------------------------------------------------------------------
+host
+ trace A (conn_refused_recv.strace.linux.client)
+ trace B (conn_refused_recv.strace.linux.server)
+
+--------------------------------------------------------------------------------
+Verifying Traces
+--------------------------------------------------------------------------------
+[Warning] trace A: ('connect_syscall', (1, '127.0.0.1', 38317), (-1, 'ECONNREFUSED'))
+   => ECONNREFUSED: [Ambiguous Misbehavior]                The target address was not listening for connections.
+[Warning] trace A: ('recv_syscall', (1, None, 1024, 0), (-1, 'ENOTCONN'))
+   => ENOTCONN: [Application Error]             A receive is attempted on a connection-mode socket that is not connected.
+
+Done
+
+--------------------------------------------------------------------------------
+Network Configuration Issues
+--------------------------------------------------------------------------------
+Trace A failed to connect to 127.0.0.1:38317 1 time(s) because the connection was refused
+   This address matches server socket B0, which was bound to 127.0.0.1:38317
+
+--------------------------------------------------------------------------------
+Possible Problems Detected
+--------------------------------------------------------------------------------
+ * [Ambiguous Misbehavior] One or more connects to addresses that were being listened on failed. This may be due to the timing of the connect and listen or may be due to a network issue.
+
+For more details, adjust the variables defined in trace_output.py and posix_output.py to change the level of output

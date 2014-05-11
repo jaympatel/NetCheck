@@ -1,0 +1,28 @@
+--------------------------------------------------------------------------------
+Configuration
+--------------------------------------------------------------------------------
+host
+ trace A (connect_progress_connected.strace.client)
+ trace B (connect_progress_connected.strace.server)
+
+--------------------------------------------------------------------------------
+Verifying Traces
+--------------------------------------------------------------------------------
+TCP socket A1 connecting to socket B0 (public address 127.0.0.1:40525)
+TCP server socket B0 (private address 127.0.0.1:40525) returning socket B1, which is connected to socket A1 (public address 127.0.0.1:52154)
+[Warning] trace A: ('connect_syscall', (1, '127.0.0.1', 40525), (-1, 'EISCONN'))
+   => EISCONN: [Application Error] Socket is already connected.
+
+Done
+
+--------------------------------------------------------------------------------
+TCP Connection Statistics
+--------------------------------------------------------------------------------
+Connection from socket A1 (public address 127.0.0.1:52154) to socket B1 (public address 127.0.0.1:40525)
+ * Data sent to accepting socket B1: 0 bytes sent, 0 bytes received, 0 bytes lost
+ * Data sent to connected socket A1: 0 bytes sent, 0 bytes received, 0 bytes lost
+
+--------------------------------------------------------------------------------
+Possible Problems Detected
+--------------------------------------------------------------------------------
+ * None

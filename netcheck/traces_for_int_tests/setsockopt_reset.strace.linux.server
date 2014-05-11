@@ -1,0 +1,23 @@
+set_robust_list(0xb70f4bb0, 0xc)        = 0
+time(NULL)                              = 1346985638
+open("/sys/devices/system/cpu/online", O_RDONLY|O_CLOEXEC) = 3
+read(3, "0\n", 8192)                    = 2
+close(3)                                = 0
+mmap2(NULL, 2097152, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0xb66f4000
+munmap(0xb66f4000, 49152)               = 0
+munmap(0xb6800000, 999424)              = 0
+mprotect(0xb6700000, 135168, PROT_READ|PROT_WRITE) = 0
+futex(0x8c3e9f0, FUTEX_WAKE_PRIVATE, 1) = 1
+futex(0x8c3e660, FUTEX_WAKE_PRIVATE, 1) = 1
+socket(PF_INET, SOCK_STREAM, IPPROTO_IP) = 3
+bind(3, {sa_family=AF_INET, sin_port=htons(34338), sin_addr=inet_addr("127.0.0.1")}, 16) = 0
+listen(3, 1)                            = 0
+accept(3, {sa_family=AF_INET, sin_port=htons(43931), sin_addr=inet_addr("127.0.0.1")}, [16]) = 4
+setsockopt(4, SOL_SOCKET, SO_LINGER, {onoff=1, linger=0}, 8) = 0
+close(4)                                = 0
+fstat64(1, {st_dev=makedev(0, 11), st_ino=3, st_mode=S_IFCHR|0620, st_nlink=1, st_uid=1000, st_gid=5, st_blksize=1024, st_blocks=0, st_rdev=makedev(136, 0), st_atime=2012/09/06-22:40:37, st_mtime=2012/09/06-22:40:37, st_ctime=2012/09/06-21:58:23}) = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb68f3000
+write(1, "[Server] Closed connection.\n", 28) = 28
+close(3)                                = 0
+madvise(0xb68f4000, 8372224, MADV_DONTNEED) = 0
+_exit(0)                                = ?

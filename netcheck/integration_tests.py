@@ -24,10 +24,13 @@ The 3 Action Arguments:
 
 3) Test Current Version of NetCheck (-t, --test):
    - tests the output of NetCheck against expected outputs using the 'diff' tool.
-   - saves output of all 'diff's in integration_test_results/ if the outputs differ.
+   - saves output of all 'diff's in the specified results directory if the outputs differ.
    - Reports integration tests as fail if any outputs differ, pass if all outputs are the same
    - if no config file is provided (via the '-c' argument), then this will run NetCheck using 
      the '-u' argument.
+   - creates a folder with current time stamp under tests/integrations_tests and saves all 
+     4 sub-directories there (traces directory, expected output directory, current output directory, 
+     and test results directory).
 
 ----------------------
 
@@ -55,20 +58,35 @@ from shutil import copy, move
 import subprocess as sp
 import os, sys
 
-
-##############################################
-# Main functions for the 3 options/arguments
-##############################################
+#############
+# CONSTANTS
+#############
 
 # a string indicating the root base URL of the traces to be downloaded
-REMOTE_BASE = 'http://blackbox.poly.edu/program_traces/semantics/'
+REMOTE_BASE = 'http://blackbox.poly.edu/program_traces/semantic_traces/'
 
 # a list of tuples, where each tuple has the trace names that will be used 
 # together to run NetCheck. All traces in this list are downloaded.
 REMOTE_TRACE_SETS = [ 
       ('close_block_recv.strace.client.linux','close_block_recv.strace.server.linux'),
-      ('conn_progress_recv.strace.linux.client','conn_progress_recv.strace.linux.server')
+      ('conn_progress_recv.strace.linux.client','conn_progress_recv.strace.linux.server'),
+      ('conn_progress_recv2.strace.linux.client', 'conn_progress_recv2.strace.linux.server'),
+      ('conn_progress_recv3.strace.linux.client', 'conn_progress_recv3.strace.linux.server'),
+      ('conn_progress_recv_success.strace.client', 'conn_progress_recv_success.strace.server'),
+      ('conn_refused_recv.strace.linux.client', 'conn_refused_recv.strace.linux.server'),
+      ('connect_invalidport2.strace.linux.client', 'connect_invalidport2.strace.linux.server'),
+      ('connect_progress_connected.strace.client', 'connect_progress_connected.strace.server'),
+      ('connect_progress_invalid.strace.client', 'connect_progress_invalid.strace.server'),
+      ('connect_progress_refused.strace.client', 'connect_progress_refused.strace.server'),
+      ('setsockopt_reset.strace.linux.client', 'setsockopt_reset.strace.linux.server'),
+      ('shutdown_block_recv.strace.client.linux', 'shutdown_block_recv.strace.server.linux'),
+      ('shutdown_reset.strace.client', 'shutdown_reset.strace.server')
       ]
+
+
+##############################################
+# Main functions for the 3 options/arguments
+##############################################
 
 def download_traces(traces_dir, config_filename):
    """
@@ -110,9 +128,9 @@ def download_traces(traces_dir, config_filename):
    print 'Successfully downloaded all traces'
 
 
-def generate_expected(traces_dir, output_dir, config_filename):
+def generate_expected(traces_dir, exp_output_dir, config_filename):
    """
-   Run NetCheck and save the outputs in the output_dir directory provided by user.
+   Run NetCheck and save the outputs in the exp_output_dir directory provided by user.
    """
    use_config_file = config_filename != None
 
@@ -125,9 +143,9 @@ def generate_expected(traces_dir, output_dir, config_filename):
       sys.exit(1)
 
    # if the outputs directory does not exist, then create it
-   ext_output_dir = os.sep + output_dir
-   if (output_dir not in subdirs):
-	   os.mkdir(path + ext_output_dir)
+   ext_exp_output_dir = os.sep + exp_output_dir
+   if (exp_output_dir not in subdirs):
+	   os.mkdir(path + ext_exp_output_dir)
 
    print 'Generating expected output from traces in ' + traces_dir + '...'
 
@@ -158,7 +176,7 @@ def generate_expected(traces_dir, output_dir, config_filename):
       if output == '':
    	  print 'Error running NetCheck on: ', trace_set
       else:
-   	  os.chdir(path + ext_output_dir)
+   	  os.chdir(path + ext_exp_output_dir)
    	  f = open('expected_output-' + str(i) + '.txt', 'w')
    	  i += 1
    	  f.write(output)
@@ -172,10 +190,10 @@ def generate_expected(traces_dir, output_dir, config_filename):
    print 'Completed generating expected outputs'
 
 
-def generate_test(traces_dir, output_dir, config_filename):
+def generate_test(traces_dir, exp_output_dir, cur_output_dir, test_results_dir, config_filename):
    """
    Run NetCheck and compare output against the expected output (obtained from the
-   output_dir provided by user).
+   exp_output_dir provided by user).
    """
    use_config_file = config_filename != None
 
@@ -188,17 +206,21 @@ def generate_test(traces_dir, output_dir, config_filename):
       sys.exit(1)
 
    # if output directory is not a subdirectory, then report error and exit
-   if (output_dir not in subdirs):
-      print 'Expected %s sub-directory, but it does not exist' % output_dir
+   if (exp_output_dir not in subdirs):
+      print 'Expected %s sub-directory, but it does not exist' % exp_output_dir
       sys.exit(1)
    else:
-      ext_output_dir = os.sep + output_dir
+      ext_exp_output_dir = os.sep + exp_output_dir
+      
+   # if the CURRENT_OUTPUTS_DIR dir does not exist, then create it
+   ext_cur_output_dir = os.sep + cur_output_dir
+   if (cur_output_dir not in subdirs):
+      os.mkdir(path + ext_cur_output_dir)
 
-   # if the integration_test_results dir does not exist, then create it
-   test_results = 'integration_test_results'
-   ext_test_results = os.sep + test_results
-   if (test_results not in subdirs):
-      os.mkdir(path + ext_test_results)
+   # if the INT_test_results_dir dir does not exist, then create it
+   ext_test_results_dir = os.sep + test_results_dir
+   if (test_results_dir not in subdirs):
+      os.mkdir(path + ext_test_results_dir)
 
    print 'Creating current NetCheck outputs...'
 
@@ -225,7 +247,7 @@ def generate_test(traces_dir, output_dir, config_filename):
       if output == '':
         print 'Error running NetCheck on: ', trace_set
       else:
-        os.chdir(path + ext_output_dir)
+        os.chdir(path + ext_cur_output_dir)
         f = open('current_output-' + str(i) + '.txt', 'w')
         i += 1
         f.write(output)
@@ -235,9 +257,12 @@ def generate_test(traces_dir, output_dir, config_filename):
       for trace in trace_set:
          os.remove(path + os.sep + trace)
 
-   os.chdir(path + ext_output_dir)
-   files = get_files(path + ext_output_dir)
-   output_dict = create_output_tuples(files)
+   exp_files = get_files(path + ext_exp_output_dir)
+   cur_files = get_files(path + ext_cur_output_dir)
+   output_dict = create_output_tuples(cur_files, exp_files)
+
+   # return to root dir of this file
+   os.chdir(path)
 
    print 'Completed creating NetCheck outputs'
    print
@@ -247,15 +272,19 @@ def generate_test(traces_dir, output_dir, config_filename):
    for output_num, output_files in output_dict.iteritems():
       cur_output_file = output_files[0]
       exp_output_file = output_files[1]
-      cmd = ['diff', exp_output_file, cur_output_file]
+
+      full_name_cur_output_file = path + ext_cur_output_dir + os.sep + cur_output_file
+      full_name_exp_output_file = path + ext_exp_output_dir + os.sep + exp_output_file
+
+      cmd = ['diff', full_name_cur_output_file, full_name_exp_output_file]
       try:
          shell_output = sp.check_output(cmd, stderr=sp.STDOUT)
       except sp.CalledProcessError as e:
-         os.chdir(path + ext_test_results)
+         os.chdir(path + ext_test_results_dir)
          f = open('diff_outputs-' + str(output_num) + '.txt', 'w')
          f.write(e.output)
          f.close()
-         os.chdir(path + ext_output_dir)
+         os.chdir(path)
          test_fail = True
       
    print 'Completed testing NetCheck outputs'
@@ -263,12 +292,12 @@ def generate_test(traces_dir, output_dir, config_filename):
    print
    print '------------------ RESULT -----------------'
    if test_fail:
-      print 'NetCheck did not pass the integration tests. Please see the diff_output files in \'tests/integration_tests/%s\' for more information' % test_results
+      print 'NetCheck did not pass the integration tests. Please see the diff_output files in \'tests/integration_tests/%s\' for more information' % test_results_dir
    else:
       print 'NetCheck passed the intergration tests!'
    print '-------------------------------------------'
 
-   clean_up(path + os.sep + traces_dir, path + ext_output_dir, path + ext_test_results)
+   clean_up(traces_dir, exp_output_dir, cur_output_dir, test_results_dir)
 
 
 def get_trace_names(config_filename):
@@ -311,38 +340,69 @@ def get_files(current_dir):
    return [name for name in os.listdir(current_dir) if os.path.isfile(os.path.join(current_dir, name))]
 
 
-def create_output_tuples(files):
+def create_output_tuples(cur_output_files, exp_output_files):
    """
    Return a dict of current output and the corresponding expected output files.
    Key:   The Number of the files [0,1,...]
-   Value: A List of the files as [current output file, expected output file]
+   Value: A tuple of the files as (current output file, expected output file)
    """
    output_dict = {}
    
-   for file_name in sorted(files):
-      key = file_name.split('-')[-1].split('.')[0]
-      if key in output_dict:
-         output_dict[key].append(file_name)
+   #for file_name in sorted(files):
+   #   key = file_name.split('-')[-1].split('.')[0]
+   #   if key in output_dict:
+   #      output_dict[key].append(file_name)
+   #   else:
+   #      output_dict[key] = [file_name]
+   
+   current = sorted(cur_output_files)
+   expected = sorted(exp_output_files)
+
+   tuples = zip(current, expected)
+
+   # check for mismatches of cur/exp output file names and create the output_dict
+   for t in tuples:
+      cur_key = t[0].split('-')[-1].split('.')[0]
+      exp_key = t[1].split('-')[-1].split('.')[0]
+      if cur_key != exp_key:
+         print 'Error: The file number for expected outputs and current outputs do not match for: ', t
       else:
-         output_dict[key] = [file_name]
+         output_dict[cur_key] = t
 
    return output_dict
 
 
-def clean_up(traces_path, output_path, integ_results_path):
+def clean_up(traces_dir, exp_output_dir, cur_output_dir, integ_results_dir):
    """
    Move all the integration tests related directories to the appropriate spot
    (i.e., under tests/integration_tests)
    """
    path = get_path()
 
+   traces_path = path + os.sep + traces_dir
+   exp_output_path = path + os.sep + exp_output_dir
+   cur_output_path = path + os.sep + cur_output_dir
+   integ_results_path = path + os.sep + integ_results_dir
+
    # create a time-stamp based folder to store all integration tests results
    results_folder_name = get_time_stamp()
    results_folder_path = path + os.sep + 'tests' + os.sep + 'integration_tests' + os.sep + results_folder_name
    os.mkdir(results_folder_path)
-   move(traces_path, results_folder_path)
-   move(output_path, results_folder_path)
+   move(cur_output_path, results_folder_path)
    move(integ_results_path, results_folder_path)
+   
+   new_traces_dir = results_folder_path + os.sep + traces_dir
+   os.mkdir(new_traces_dir)
+   os.chdir(traces_path)
+   for f in get_files(traces_path):
+      copy(f, new_traces_dir)
+   
+   new_exp_output_dir = results_folder_path + os.sep + exp_output_dir
+   os.mkdir(new_exp_output_dir)
+   os.chdir(exp_output_path)
+   for f in get_files(exp_output_path):
+      copy(f, new_exp_output_dir)
+
 
 def get_time_stamp():
    """
@@ -370,9 +430,9 @@ def init_options(parser):
 
    hlp_c = 'If this argument is passed, then the program will use the config file for getting traces or running NetCheck.'
 
-   parser.add_argument('-d', '--download',nargs='?',const=DFLT_DWNLD_DIR,metavar=('DOWNLOAD_DIRECTORY'),type=str,help=hlp_d)
-   parser.add_argument('-e', '--expected',nargs=2,metavar=('TRACES_DIRECTORY', 'OUTPUT_DIRECTORY'),type=str,help=hlp_e)
-   parser.add_argument('-t', '--test',nargs=2,metavar=('TRACES_DIRECTORY', 'OUTPUT_DIRECTORY'),type=str,help=hlp_t)   
+   parser.add_argument('-d', '--download',nargs='?',const=DFLT_DWNLD_DIR,metavar=('DOWNLOAD_DIRECTORY_NAME'),type=str,help=hlp_d)
+   parser.add_argument('-e', '--expected',nargs=2,metavar=('TRACES_DIRECTORY', 'EXPECTED_OUTPUTS_DIRECTORY_NAME'),type=str,help=hlp_e)
+   parser.add_argument('-t', '--test',nargs=4,metavar=('TRACES_DIRECTORY', 'EXPECTED_OUTPUTS_DIRECTORY', 'CURRENT_OUTPUTS_DIRECTORY_NAME', 'TESTS_RESULTS_DIRECTORY_NAME'),type=str,help=hlp_t)   
    parser.add_argument('-c', '--configfile',nargs='?',metavar=('CONFIG_FILE'),type=str,help=hlp_c)
 
 
@@ -427,7 +487,7 @@ if __name__ == "__main__":
       generate_expected(normalize_dir(args.expected[0]), normalize_dir(args.expected[1]), args.configfile)
       sys.exit(0)
    elif args.test != None:
-      generate_test(normalize_dir(args.test[0]), normalize_dir(args.test[1]), args.configfile)
+      generate_test(normalize_dir(args.test[0]), normalize_dir(args.test[1]), normalize_dir(args.test[2]), normalize_dir(args.test[3]), args.configfile)
       sys.exit(0)
    else:
       print 'Please specify exactly 1 action argument. Use the -h argument for help'

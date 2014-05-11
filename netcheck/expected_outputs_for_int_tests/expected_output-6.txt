@@ -1,0 +1,27 @@
+--------------------------------------------------------------------------------
+Configuration
+--------------------------------------------------------------------------------
+host
+ trace A (connect_invalidport2.strace.linux.client)
+ trace B (connect_invalidport2.strace.linux.server)
+
+--------------------------------------------------------------------------------
+Verifying Traces
+--------------------------------------------------------------------------------
+[Warning] trace A: ('connect_syscall', (1, '127.0.0.1', 33372), (-1, 'ECONNREFUSED'))
+   => ECONNREFUSED: [Ambiguous Misbehavior]                The target address was not listening for connections.
+
+Done
+
+--------------------------------------------------------------------------------
+Network Configuration Issues
+--------------------------------------------------------------------------------
+Trace A failed to connect to 127.0.0.1:33372 1 time(s) because the connection was refused
+
+Several nonblocking connects may have failed to connect
+ * 1 nonblocking connects from trace A to 127.0.0.1:33372 were never observed to connect
+
+--------------------------------------------------------------------------------
+Possible Problems Detected
+--------------------------------------------------------------------------------
+ * None

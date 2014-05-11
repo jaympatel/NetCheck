@@ -1,0 +1,35 @@
+--------------------------------------------------------------------------------
+Configuration
+--------------------------------------------------------------------------------
+host
+ trace A (conn_progress_recv2.strace.linux.client)
+ trace B (conn_progress_recv2.strace.linux.server)
+
+--------------------------------------------------------------------------------
+Verifying Traces
+--------------------------------------------------------------------------------
+
+No valid action:
+[Error] trace B: ('accept_syscall', (0, '127.0.0.1', 60348), (1, None))
+   => NO_PENDING_CONN: There are no pending connections.
+
+--------------------------------------------------------------------------------
+Network Configuration Issues
+--------------------------------------------------------------------------------
+TCP server socket B0 (private address 127.0.0.1:59593) failed to find corresponding connects for 1 accept(s)
+ * There are 1 unmatched accepts from IP 127.0.0.1
+ * Trace B may be behind a NAT and port forwarding may be occurring
+
+Several nonblocking connects may have failed to connect
+ * 1 nonblocking connects from trace A to 127.0.0.1:59593 were never observed to connect
+
+Please check if there are any NATs present which are not explicitly declared in the configuration file
+ * If so, add them to configuration file and rerun NetCheck
+
+--------------------------------------------------------------------------------
+Possible Problems Detected
+--------------------------------------------------------------------------------
+ * The model failed to process the entire trace
+ * There may be one or more NATs not declared in the configuration file
+
+For more details, adjust the variables defined in trace_output.py and posix_output.py to change the level of output

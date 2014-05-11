@@ -1,0 +1,26 @@
+--------------------------------------------------------------------------------
+Configuration
+--------------------------------------------------------------------------------
+host
+ trace A (setsockopt_reset.strace.linux.client)
+ trace B (setsockopt_reset.strace.linux.server)
+
+--------------------------------------------------------------------------------
+Verifying Traces
+--------------------------------------------------------------------------------
+TCP socket A1 connecting to socket B0 (public address 127.0.0.1:34338)
+TCP server socket B0 (private address 127.0.0.1:34338) returning socket B1, which is connected to socket A1 (public address 127.0.0.1:43931)
+
+Done
+
+--------------------------------------------------------------------------------
+TCP Connection Statistics
+--------------------------------------------------------------------------------
+Connection from socket A1 (public address 127.0.0.1:43931) to socket B1 (public address 127.0.0.1:34338)
+ * Data sent to accepting socket B1: 0 bytes sent, 0 bytes received, 0 bytes lost
+ * Data sent to connected socket A1: 0 bytes sent, 0 bytes received, 0 bytes lost
+
+--------------------------------------------------------------------------------
+Possible Problems Detected
+--------------------------------------------------------------------------------
+ * None

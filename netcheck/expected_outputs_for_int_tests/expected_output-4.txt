@@ -1,0 +1,26 @@
+--------------------------------------------------------------------------------
+Configuration
+--------------------------------------------------------------------------------
+host
+ trace A (conn_progress_recv_success.strace.client)
+ trace B (conn_progress_recv_success.strace.server)
+
+--------------------------------------------------------------------------------
+Verifying Traces
+--------------------------------------------------------------------------------
+TCP socket A1 connecting to socket B0 (public address 127.0.0.1:48589)
+TCP server socket B0 (private address 127.0.0.1:48589) returning socket B1, which is connected to socket A1 (public address 127.0.0.1:40457)
+
+Done
+
+--------------------------------------------------------------------------------
+TCP Connection Statistics
+--------------------------------------------------------------------------------
+Connection from socket A1 (public address 127.0.0.1:40457) to socket B1 (public address 127.0.0.1:48589)
+ * Data sent to accepting socket B1: 0 bytes sent, 0 bytes received, 0 bytes lost
+ * Data sent to connected socket A1: 5 bytes sent, 5 bytes received, 0 bytes lost
+
+--------------------------------------------------------------------------------
+Possible Problems Detected
+--------------------------------------------------------------------------------
+ * None

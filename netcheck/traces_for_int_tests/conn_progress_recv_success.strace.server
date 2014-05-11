@@ -1,0 +1,26 @@
+set_robust_list(0xb7046bb0, 0xc)        = 0
+time(NULL)                              = 1347047857
+open("/sys/devices/system/cpu/online", O_RDONLY|O_CLOEXEC) = 3
+read(3, "0\n", 8192)                    = 2
+close(3)                                = 0
+mmap2(NULL, 2097152, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0xb6646000
+munmap(0xb6646000, 761856)              = 0
+munmap(0xb6800000, 286720)              = 0
+mprotect(0xb6700000, 135168, PROT_READ|PROT_WRITE) = 0
+futex(0x9adbfe8, FUTEX_WAKE_PRIVATE, 1) = 1
+futex(0x9ac0700, FUTEX_WAKE_PRIVATE, 1) = 1
+socket(PF_INET, SOCK_STREAM, IPPROTO_IP) = 3
+bind(3, {sa_family=AF_INET, sin_port=htons(48589), sin_addr=inet_addr("127.0.0.1")}, 16) = 0
+listen(3, 1)                            = 0
+fcntl64(3, F_GETFL)                     = 0x2 (flags O_RDWR)
+fcntl64(3, F_SETFL, O_RDWR|O_NONBLOCK)  = 0
+fstat64(1, {st_dev=makedev(0, 11), st_ino=8, st_mode=S_IFCHR|0620, st_nlink=1, st_uid=1000, st_gid=5, st_blksize=1024, st_blocks=0, st_rdev=makedev(136, 5), st_atime=2012/09/07-15:57:37, st_mtime=2012/09/07-15:57:37, st_ctime=2012/09/07-14:47:18}) = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb6845000
+write(1, "[Server] About to accept.\n", 26) = 26
+poll([{fd=3, events=POLLIN}], 1, 5000)  = 1 ([{fd=3, revents=POLLIN}])
+accept(3, {sa_family=AF_INET, sin_port=htons(40457), sin_addr=inet_addr("127.0.0.1")}, [16]) = 5
+send(5, "Hello", 5, 0)                  = 5
+close(3)                                = 0
+close(5)                                = 0
+madvise(0xb6846000, 8372224, MADV_DONTNEED) = 0
+_exit(0)                                = ?

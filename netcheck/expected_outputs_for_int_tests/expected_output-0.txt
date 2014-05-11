@@ -1,0 +1,26 @@
+--------------------------------------------------------------------------------
+Configuration
+--------------------------------------------------------------------------------
+host
+ trace A (close_block_recv.strace.client.linux)
+ trace B (close_block_recv.strace.server.linux)
+
+--------------------------------------------------------------------------------
+Verifying Traces
+--------------------------------------------------------------------------------
+TCP socket A0 connecting to socket B0 (public address 127.0.0.1:12345)
+TCP server socket B0 (private address 127.0.0.1:12345) returning socket B1, which is connected to socket A0 (public address 127.0.0.1:59186)
+
+Done
+
+--------------------------------------------------------------------------------
+TCP Connection Statistics
+--------------------------------------------------------------------------------
+Connection from socket A0 (public address 127.0.0.1:59186) to socket B1 (public address 127.0.0.1:12345)
+ * Data sent to accepting socket B1: 0 bytes sent, 0 bytes received, 0 bytes lost
+ * Data sent to connected socket A0: 5 bytes sent, 5 bytes received, 0 bytes lost
+
+--------------------------------------------------------------------------------
+Possible Problems Detected
+--------------------------------------------------------------------------------
+ * None

@@ -1,0 +1,30 @@
+--------------------------------------------------------------------------------
+Configuration
+--------------------------------------------------------------------------------
+host
+ trace A (connect_progress_refused.strace.client)
+ trace B (connect_progress_refused.strace.server)
+
+--------------------------------------------------------------------------------
+Verifying Traces
+--------------------------------------------------------------------------------
+[Warning] trace A: ('connect_syscall', (1, '127.0.0.1', 49158), (-1, 'ECONNREFUSED'))
+   => ECONNREFUSED: [Ambiguous Misbehavior]                The target address was not listening for connections.
+
+Done
+
+--------------------------------------------------------------------------------
+Network Configuration Issues
+--------------------------------------------------------------------------------
+Trace A failed to connect to 127.0.0.1:49158 1 time(s) because the connection was refused
+   This address matches server socket B0, which was bound to 127.0.0.1:49158
+
+Several nonblocking connects may have failed to connect
+ * 1 nonblocking connects from trace A to 127.0.0.1:49158 were never observed to connect
+
+--------------------------------------------------------------------------------
+Possible Problems Detected
+--------------------------------------------------------------------------------
+ * [Ambiguous Misbehavior] One or more connects to addresses that were being listened on failed. This may be due to the timing of the connect and listen or may be due to a network issue.
+
+For more details, adjust the variables defined in trace_output.py and posix_output.py to change the level of output

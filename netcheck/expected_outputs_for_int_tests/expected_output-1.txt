@@ -1,0 +1,25 @@
+--------------------------------------------------------------------------------
+Configuration
+--------------------------------------------------------------------------------
+host
+ trace A (conn_progress_recv.strace.linux.client)
+ trace B (conn_progress_recv.strace.linux.server)
+
+--------------------------------------------------------------------------------
+Verifying Traces
+--------------------------------------------------------------------------------
+[Warning] trace A: ('recv_syscall', (1, None, 1024, 0), (-1, 'ECONNREFUSED'))
+   => ECONNREFUSED: [Ambiguous Misbehavior]                The target address was not listening for connections.
+
+Done
+
+--------------------------------------------------------------------------------
+Network Configuration Issues
+--------------------------------------------------------------------------------
+Several nonblocking connects may have failed to connect
+ * 1 nonblocking connects from trace A to 127.0.0.1:46354 were never observed to connect
+
+--------------------------------------------------------------------------------
+Possible Problems Detected
+--------------------------------------------------------------------------------
+ * None
