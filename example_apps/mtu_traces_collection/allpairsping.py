@@ -1,18 +1,22 @@
-import sys, socket, threading
+import sys, socket, time
 
 DEBUG = True
-TIMEOUT_SECONDS = 5
+TIMEOUT_SECONDS = 15
 
-def send_to_neighbours(neighbours):
-	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
-	for neighbour in neighbours:
-		their_ip = neighbour['ip']
-		their_port = neighbour['port']
-		sock.sendto('ping', (their_ip, their_port))
 
-def recv_from_neighbours(my_port):
-		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
-		sock.bind(('', my_port)) # listen on all available interfaces
+def send_to_neighbours(neighbours, sock):
+	packet_size = 100
+	while packet_size <= 4800:
+		msg = 'A' * packet_size
+		for i in range(10):
+			for neighbour in neighbours:
+				their_ip = neighbour['ip']
+				their_port = neighbour['port']
+				sock.sendto(msg, (their_ip, their_port))
+		packet_size += 100
+
+
+def recv_from_neighbours(my_port, sock):		
 		sock.settimeout(TIMEOUT_SECONDS)
 		while True:
 			data, addr = sock.recvfrom(4096) # buffer size is 4096 bytes
@@ -21,6 +25,7 @@ def recv_from_neighbours(my_port):
 			  	print 'Message Length: ', len(data)
 			  	print 'Address recv\'d from: ', addr
 			 	print
+
 
 def get_neighbours(file_name):
 	neighbours = []
@@ -32,6 +37,7 @@ def get_neighbours(file_name):
 			n_port = int(split_line[1].strip())
 			neighbours.append({'ip':n_ip, 'port':n_port}) 
 	return neighbours
+
 
 if __name__ == '__main__':
 	if (len(sys.argv) != 3):
@@ -50,8 +56,12 @@ if __name__ == '__main__':
 			i += 1
 		print
 
-	send_to_neighbours(neighbours)
-	recv_from_neighbours(my_port)
+	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+	sock.bind(('', my_port)) # listen on all available interfaces
+	time.sleep(15) # so all nodes can bind to sockets
+
+	send_to_neighbours(neighbours, sock)
+	recv_from_neighbours(my_port, sock)
 
 	if DEBUG:
 		print 'Done!'
