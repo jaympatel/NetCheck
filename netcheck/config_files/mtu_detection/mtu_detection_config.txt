@@ -1,0 +1,15 @@
+host
+ trace mtu.brown.strace
+ ip 192.91.235.232
+
+host
+ trace mtu.washington.strace
+ ip 128.208.4.199
+
+host
+ trace mtu.uottawa.strace
+ ip 216.48.80.12
+
+host
+ trace mtu.virtues.fi.strace
+ ip 85.23.168.76
